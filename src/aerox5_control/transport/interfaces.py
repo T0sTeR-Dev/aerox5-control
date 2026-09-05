@@ -17,6 +17,7 @@ class HidEnumerationRecord(TypedDict):
     manufacturer_string: NotRequired[str | None]
     product_string: NotRequired[str | None]
     serial_number: NotRequired[str | None]
+    release_number: NotRequired[int | None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,11 +33,16 @@ class HidInterface:
     product_string: str | None
     serial_number: str | None
     path: bytes | str
+    release_number: int | None = None
 
     @classmethod
     def from_enumeration(cls, record: HidEnumerationRecord) -> "HidInterface":
         """Copy metadata without querying an interface for missing fields."""
         interface_number = record.get("interface_number")
+        release_number = record.get("release_number")
+        # Keep the raw USB release field; never interpret it as firmware.
+        if type(release_number) is not int or not 0 <= release_number <= 0xFFFF:
+            release_number = None
         return cls(
             vendor_id=record["vendor_id"],
             product_id=record["product_id"],
@@ -47,6 +53,7 @@ class HidInterface:
             product_string=record.get("product_string") or None,
             serial_number=record.get("serial_number") or None,
             path=record["path"],
+            release_number=release_number,
         )
 
 

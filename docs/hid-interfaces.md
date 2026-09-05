@@ -4,8 +4,9 @@ This document records Phase 2's descriptor-only observations. For Phase 3, the
 project owner confirmed interface 3 as the standard receiver's configuration
 interface, supported by public battery-query research. The implementation now
 uses that selection solely for the [documented battery query](battery-protocol.md).
-The first real battery test remains a manual step; no transaction has been run
-against the physical mouse during implementation.
+The project owner subsequently confirmed that the battery query works on the
+physical mouse. No real query was run while implementing the status command or
+running its tests.
 
 Observed on 2026-09-05 on Arch Linux using the 2.4 GHz receiver, USB
 `1038:1852`. Targeted HIDAPI enumeration reported five distinct HID paths and
@@ -33,8 +34,9 @@ are **unnumbered**, with no report ID byte on the wire.
 | 3 | `/dev/hidraw9` | `0xffc0 / 0x0001` | Vendor-specific | 37 | 64 | 64 | 512 |
 | 4 | `/dev/hidraw10` | `0xffc1 / 0x0001` | Vendor-specific | 21 | 64 | — | — |
 
-The HID path numbers can change after reconnecting. Interface numbers above are
-observations of this receiver, not constants used by the implementation.
+The HID path numbers can change after reconnecting. Descriptor inspection uses
+enumeration metadata; `battery` and `status` require the confirmed interface 3
+and open its enumerated path.
 
 Interface 0 describes eight buttons, 16-bit X/Y movement, an 8-bit wheel,
 8-bit Consumer AC Pan, and five bytes on vendor page `0xffc1`: 96 bits total.
@@ -47,7 +49,7 @@ a SteelSeries configuration interface.
 
 Interface 2 describes two 16-bit consumer values: four input bytes.
 
-## Configuration candidate: interface 3, uncertain
+## Configuration candidate: Phase 2 inference, later confirmed for battery
 
 Interface 3 is the strongest candidate among these five interfaces because its
 application page is vendor-specific (`0xffc0`) and it declares both output and
@@ -66,8 +68,9 @@ Interface 4 is also vendor-specific, but advertises only a 64-byte input report.
 Its purpose is unknown; descriptor evidence alone cannot establish whether it
 carries status, events, or another kind of data.
 
-The interface 3 conclusion is a structural inference, not verified SteelSeries
-protocol knowledge. Descriptors do not establish command formats, configuration
+The Phase 2 interface 3 conclusion was a structural inference. Subsequent public
+research and the owner's successful battery test confirm it for that transaction.
+Descriptors alone do not establish command formats, configuration
 semantics, persistence, acknowledgments, or safe values. No configuration
 setting commands have been implemented. Phase 3's battery query is documented
 separately. The wired device's layout remains unverified;

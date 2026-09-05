@@ -5,8 +5,13 @@ import sys
 from collections.abc import Sequence
 
 from aerox5_control.application.hid_info import inspect_hid_descriptors
-from aerox5_control.application.services import get_battery, inspect_interfaces
+from aerox5_control.application.services import (
+    get_battery,
+    get_status,
+    inspect_interfaces,
+)
 from aerox5_control.cli.hid_info import format_candidates, format_descriptor
+from aerox5_control.cli.status import format_status
 from aerox5_control.devices.aerox5 import Aerox5Interface
 from aerox5_control.transport.hidapi_backend import HidError
 
@@ -49,15 +54,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run discovery or report an error without requesting elevated access."""
     parser = argparse.ArgumentParser(
         prog="aerox5-control-cli",
-        description="Discover the Aerox 5 Wireless and query its battery.",
+        description="Discover the Aerox 5 Wireless and query read-only device status.",
     )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("inspect", help="enumerate all matching HID interfaces")
     commands.add_parser("hid-info", help="inspect cached HID report descriptors")
     commands.add_parser("battery", help="query receiver interface 3 for battery status")
+    commands.add_parser(
+        "status",
+        help="show receiver identity and query battery/charging on interface 3",
+    )
     args = parser.parse_args(argv)
 
     try:
+        if args.command == "status":
+            return _status()
         if args.command == "battery":
             status = get_battery()
             if not status.available:
@@ -84,6 +95,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         "\n\n".join(format_interface(i, item) for i, item in enumerate(interfaces, 1))
     )
     return 0
+
+
+def _status() -> int:
+    status = get_status()
+    print(format_status(status))
+    if status.battery.reason:
+        print(f"aerox5-control-cli: {status.battery.reason}", file=sys.stderr)
+    return 0 if status.battery.available else 1
 
 
 def _hid_info() -> int:

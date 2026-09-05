@@ -87,6 +87,7 @@ def test_inspect_reports_missing_dependency(monkeypatch, capsys):
         (["inspect", "--help"], 0),
         (["hid-info", "--help"], 0),
         (["battery", "--help"], 0),
+        (["status", "--help"], 0),
         ([], 2),
         (["write"], 2),
     ],

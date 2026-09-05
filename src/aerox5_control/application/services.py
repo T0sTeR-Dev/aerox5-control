@@ -1,8 +1,9 @@
-"""Discovery and explicitly requested battery queries."""
+"""Discovery and explicitly requested read-only receiver status."""
 
 from aerox5_control.devices.aerox5 import (
     Aerox5Interface,
     Aerox5Receiver,
+    Aerox5Status,
     discover_aerox5,
 )
 from aerox5_control.protocol.aerox5 import BatteryStatus
@@ -23,3 +24,10 @@ def get_battery(transport: HidTransport | None = None) -> BatteryStatus:
     if transport is None:
         transport = HidApiTransport()
     return Aerox5Receiver(transport).get_battery()
+
+
+def get_status(transport: HidTransport | None = None) -> Aerox5Status:
+    """Combine cached identity and one documented battery/charging query."""
+    if transport is None:
+        transport = HidApiTransport()
+    return Aerox5Receiver(transport).get_status()

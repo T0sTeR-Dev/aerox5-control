@@ -4,6 +4,11 @@ Scope: standard 2.4 GHz receiver `1038:1852` only, USB interface 3, usage page
 `0xffc0`, usage `0x0001`. The interface selection was confirmed by the project
 owner for Phase 3. The corresponding vendor-specific application and report
 layout were captured in [Phase 2](hid-interfaces.md).
+The project owner subsequently confirmed successful real battery/charging
+queries. Both `battery` and `status` now share this same transaction; `status`
+adds enumeration metadata without adding commands. See
+[device-information research](device-information.md) for corroborating sources
+and the firmware query deferral.
 
 The USB interface number is distinct from an endpoint address. HIDAPI handles
 endpoint selection. The program opens the exact path returned by enumeration,
@@ -97,9 +102,9 @@ either the percentage and charging state or `Battery: unavailable`. Failure
 diagnostics go to stderr; exit codes are 0 for success, 1 for unavailable, and 2
 for invalid CLI arguments.
 
-No real battery command was executed during development. With the mouse awake
-and receiver connected, manually run from the project directory as the normal
-desktop user:
+No real battery command was executed while implementing status or running its
+automated tests. With the mouse awake and receiver connected, manually run from
+the project directory as the normal desktop user:
 
 ```sh
 .venv/bin/aerox5-control-cli battery
@@ -112,5 +117,5 @@ Battery: 75%
 Charging: no
 ```
 
-The numeric value above is illustrative. A failure remains explicit; no actual
-battery percentage is claimed until this manual test succeeds.
+The numeric value above is illustrative; the CLI reports the current validated
+response or an explicit unavailable state.

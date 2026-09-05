@@ -84,6 +84,20 @@ def test_zero_metadata_is_preserved(hid_backend, record):
     )
 
 
+@pytest.mark.parametrize("release", [0, 0x0100, 0x1203, 0xFFFF])
+def test_release_number_is_raw_enumeration_metadata(hid_backend, record, release):
+    hid_backend.enumerate.return_value = [{**record, "release_number": release}]
+    assert HidApiTransport().enumerate()[0].release_number == release
+    assert hid_backend.mock_calls == [call.enumerate(0, 0)]
+
+
+@pytest.mark.parametrize("release", [None, -1, 0x10000, True, "1.0", 1.0])
+def test_invalid_release_number_is_unavailable(hid_backend, record, release):
+    hid_backend.enumerate.return_value = [{**record, "release_number": release}]
+    assert HidApiTransport().enumerate()[0].release_number is None
+    assert hid_backend.mock_calls == [call.enumerate(0, 0)]
+
+
 @pytest.mark.parametrize("path", [b"/dev/hidraw-\xff", "/dev/hidraw-unicode-ä"])
 def test_paths_are_preserved_without_decoding(hid_backend, record, path):
     record["path"] = path

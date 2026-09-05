@@ -36,6 +36,18 @@ class Aerox5Interface:
     connection: str
 
 
+@dataclass(frozen=True, slots=True)
+class Aerox5Status:
+    """Enumeration metadata survives a failed battery query.
+
+    Connection describes the receiver's USB identity, not a live radio link.
+    Firmware and hardware revision are not yet supported by this implementation.
+    """
+
+    interface: Aerox5Interface | None
+    battery: BatteryStatus
+
+
 def discover_aerox5(transport: HidDiscovery) -> tuple[Aerox5Interface, ...]:
     """Retain all matching entries, including interfaces sharing HID paths."""
     return tuple(
@@ -64,7 +76,11 @@ class Aerox5Receiver:
         self._transport = transport
 
     def get_battery(self) -> BatteryStatus:
+        return self.get_status().battery
+
+    def get_status(self) -> Aerox5Status:
         """One query and one bounded read on the same handle; never retry."""
+        selected = None
         try:
             entries = self._transport.enumerate(
                 STEELSERIES_VENDOR_ID, AEROX5_RECEIVER_PRODUCT_ID
@@ -75,26 +91,39 @@ class Aerox5Receiver:
                 if _is_receiver_configuration(entry)
             }
             if not candidates:
-                return BatteryStatus.unavailable(
-                    "Receiver configuration interface not found"
+                return Aerox5Status(
+                    interface=None,
+                    battery=BatteryStatus.unavailable(
+                        "Receiver configuration interface not found"
+                    ),
                 )
             if len(candidates) != 1:
-                return BatteryStatus.unavailable(
-                    "Multiple receiver configuration interfaces found"
+                return Aerox5Status(
+                    interface=None,
+                    battery=BatteryStatus.unavailable(
+                        "Multiple receiver configuration interfaces found"
+                    ),
                 )
             path = next(iter(candidates))
             if any(
-                entry.path == path and not _is_receiver_configuration(entry)
-                for entry in entries
+                entry.path == path and entry != candidates[path] for entry in entries
             ):
-                return BatteryStatus.unavailable(
-                    "Conflicting metadata for the selected HID path"
+                return Aerox5Status(
+                    interface=None,
+                    battery=BatteryStatus.unavailable(
+                        "Conflicting metadata for the selected HID path"
+                    ),
                 )
+            selected = Aerox5Interface(
+                hid=candidates[path],
+                connection=_CONNECTIONS[AEROX5_RECEIVER_PRODUCT_ID],
+            )
             with self._transport.open_path(path) as connection:
                 connection.write_output(battery_query_payload(), report_id=0)
                 response = connection.read_input(
                     CONFIGURATION_INPUT_REPORT_SIZE, timeout_ms=BATTERY_READ_TIMEOUT_MS
                 )
-            return decode_battery_response(response)
+            battery = decode_battery_response(response)
         except (HidError, OSError) as error:
-            return BatteryStatus.unavailable(str(error))
+            battery = BatteryStatus.unavailable(str(error))
+        return Aerox5Status(interface=selected, battery=battery)

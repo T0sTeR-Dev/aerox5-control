@@ -1,9 +1,9 @@
 # aerox5-control
 
 An independent Linux utility for the SteelSeries Aerox 5 Wireless. The current
-implementation provides **HID discovery, cached descriptor inspection, and a
-battery query** using python-hidapi. The battery query is the only implemented
-device command; it does not change settings.
+implementation provides **HID discovery, cached descriptor inspection, device
+status, and a battery query** using python-hidapi. The battery query is the only
+implemented device command; it does not change settings.
 It has no dependency on rivalcfg and does not install, import, invoke, or bundle it.
 
 ## Development setup
@@ -111,8 +111,9 @@ normal desktop user:
 ```
 
 After activating `.venv`, the equivalent command is `aerox5-control-cli battery`.
-This command intentionally sends one documented battery query. It has not been
-run against the physical mouse during implementation or automated tests.
+This command intentionally sends one documented battery query. The project owner
+has confirmed that it works on the physical mouse. No hardware query was run
+during implementation or automated tests of the status command.
 
 The command enumerates only `1038:1852`, selects interface 3 with usage page
 `0xffc0` and usage `0x0001`, and opens that returned path. It does not hardcode
@@ -141,19 +142,47 @@ Successful queries exit with status 0. The normal user needs access to the
 selected hidraw node; permission failure is reported without elevating privileges
 or changing permissions. This phase installs no udev rules.
 
+## Device status
+
+```sh
+.venv/bin/aerox5-control-cli status
+```
+
+`status` displays the device name, connection type, VID/PID, selected interface,
+HID path, available manufacturer/serial metadata, and battery/charging state.
+It uses the same single `00 D2` query, selection checks, and 1000 ms read timeout
+as `battery`. It introduces no new HID command and sends no feature reports.
+
+When available, `USB device release (bcdDevice)` shows the raw hexadecimal
+`release_number` from HIDAPI enumeration. This field describes the enumerated
+receiver; it is not interpreted as mouse firmware or hardware revision.
+`Connection: 2.4 GHz` describes the receiver mode, not proof of a live mouse link.
+
+Public research established the existing battery/charging query. A firmware
+getter in OpenRGB remains a research lead with unresolved framing, initialization,
+and receiver/mouse version ownership questions. Firmware and hardware revision
+are not queried or displayed. See [the evidence and decisions](docs/device-information.md).
+
+On battery failure, available identity metadata remains visible alongside
+`Battery: unavailable`; charging is omitted, the reason goes to stderr, and the
+command exits 1. Selection failure also prints `Device: unavailable`. Success
+exits 0, even when optional metadata is missing. `status` queries only the standard
+`1038:1852` receiver; wired devices remain available through discovery commands.
+
 ## Safety and architecture
 
 `inspect` only enumerates devices; `hid-info` additionally reads cached sysfs
 metadata. Neither opens a HID handle or requests/sends reports. Only the explicit
-`battery` command opens receiver interface 3 and sends `00 D2`. It never sends
-feature reports or any setting, save, reset, or firmware commands. Importing the
+`battery` or `status` command opens receiver interface 3 and sends `00 D2`.
+It never sends feature reports or any setting, save, reset, or firmware commands. Importing the
 application and requesting CLI help do not import or initialize the HID backend.
 
 The transport package contains generic HID enumeration, sysfs access, and managed
 output/input report I/O. It knows no Aerox command bytes. The
 `hid_descriptor` package parses bytes without I/O or Aerox protocol knowledge.
 The protocol package constructs the battery payload and strictly decodes replies.
-The devices package owns Aerox interface selection and the battery transaction.
+The devices package owns Aerox interface selection, the battery transaction,
+and structured device status with cached identity metadata.
 Application services expose these operations; the CLI formats their results.
 GTK UI and settings remain future work.
 
