@@ -12,9 +12,11 @@ dependencies = ["hidapi>=0.14"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.11"]
+gui = ["PyGObject>=3.46"]
 
 [project.scripts]
 aerox5-control-cli = "aerox5_control.cli.main:main"
+aerox5-control = "aerox5_control.gui.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

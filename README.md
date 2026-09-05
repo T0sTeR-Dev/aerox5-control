@@ -1,9 +1,10 @@
 # aerox5-control
 
-An independent Linux utility for the SteelSeries Aerox 5 Wireless. The current
-implementation provides **HID discovery, cached descriptor inspection, device
-status, a battery query, active polling-rate control, and DPI presets** using
-python-hidapi. Polling and DPI are separate operations; neither sends a save command.
+An independent Linux utility for the SteelSeries Aerox 5 Wireless. The v0.1
+application, **Aerox 5 Control**, provides a native GTK4/Libadwaita window and a CLI
+for **HID discovery, cached descriptor inspection, device status, a battery query,
+active polling-rate control, and DPI presets** using python-hidapi.
+Polling and DPI are separate operations; neither sends a save command.
 It has no dependency on rivalcfg and does not install, import, invoke, or bundle it.
 
 ## Development setup
@@ -31,6 +32,49 @@ python3 -m venv .venv
 After activating the environment, the command is `aerox5-control-cli inspect`.
 `python -m aerox5_control inspect` is also supported. Run the application as your
 normal user; it does not require root or install permission rules.
+
+## Graphical application
+
+The GUI requires GTK4, Libadwaita 1.4 or newer, and PyGObject. On Arch these are
+provided by `gtk4`, `libadwaita`, and `python-gobject`. Use a virtual environment
+that can see the system bindings (the command also enables them in an existing
+`.venv`):
+
+```sh
+python3 -m venv --system-site-packages .venv
+.venv/bin/python -m pip install -e '.[dev,gui]'
+.venv/bin/aerox5-control
+```
+
+After activating `.venv`, launch with `aerox5-control`. The module entry point is
+`python -m aerox5_control.gui`. The existing CLI entry points remain unchanged and
+do not require GTK. Run the GUI as your normal Wayland/Hyprland desktop user.
+
+**Overview** shows the device name, connection state/type, VID/PID, battery, and
+charging state. Opening the window performs one existing status/battery query.
+Use **Refresh** to rediscover the receiver and update the overview thereafter;
+there is no timer or continuous polling. A detected receiver alone does not prove
+that the mouse is awake. Errors leave the window open; reconnect or wake the
+mouse and use Refresh to recover.
+
+**Sensitivity** contains 1–5 DPI entries and a polling-rate selector with 125,
+250, 500, and 1000 Hz. DPI must be 100–18000 in exact steps of 100; invalid input
+is rejected without rounding. Entries start empty and the polling selector starts
+with “Choose a rate…”. Values are session drafts, not settings read from hardware.
+Each setting has its own explicit **Apply** button. Editing, switching pages,
+and changing the preset count do not write to the mouse. Applying DPI selects the
+first preset, as in the CLI.
+
+One Apply action calls one existing service operation, with one setting write and
+one bounded readback. Feedback reports that a request was sent; it does not claim
+independent verification of the setting. A readback failure can occur after the
+setting has changed, and is reported without retrying. Controls are temporarily
+disabled while an operation runs off the GTK thread.
+
+v0.1 has no RGB, button mapping, timers, profiles, automatic application,
+background daemon, startup service, onboard save/persistence, reset, firmware
+operations, macros, or Bluetooth configuration. See
+[GUI architecture, behavior, and tests](docs/gui.md).
 
 ## Discovery
 
@@ -189,7 +233,10 @@ TrueMove Air lookup table, and strictly decodes battery replies. The devices
 package owns Aerox interface selection, the transactions, structured device
 status, and setting request results with opaque readback bytes.
 Application services expose these operations; the CLI formats their results.
-GTK UI and other settings remain future work.
+The desktop service adapts them to overview and feedback state, while a small
+controller runs operations on a single worker and dispatches results to GTK's
+main thread. The GUI imports only that application API and GUI libraries; it
+does not open device paths, construct packets, or import transport/protocol code.
 
 ## Active polling-rate control: manual hardware test
 
@@ -298,3 +345,11 @@ trees. Tests do not access physical HID devices or the real sysfs tree.
 DPI tests use their own exact-packet allowlist and a separate reference fixture
 to verify every supported DPI value. Tests never install or execute reference
 projects and need no network access.
+
+Desktop tests use fake services and the existing strict HID mocks. If PyGObject,
+GTK4, Libadwaita, and `gtk4-broadwayd` are installed, pytest also exercises the real
+GTK widgets on a private headless Broadway display with fake services and blocked
+HID modules. It uses temporary Unix sockets, opens no browser, and never connects
+to the user's Wayland/X11 display or real mouse. That native test is explicitly
+skipped when its optional native dependencies are absent. No physical GUI or
+device operation is run by tests.
