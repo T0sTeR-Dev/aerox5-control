@@ -1,5 +1,12 @@
 # Aerox 5 Wireless HID interface observations
 
+This document records Phase 2's descriptor-only observations. For Phase 3, the
+project owner confirmed interface 3 as the standard receiver's configuration
+interface, supported by public battery-query research. The implementation now
+uses that selection solely for the [documented battery query](battery-protocol.md).
+The first real battery test remains a manual step; no transaction has been run
+against the physical mouse during implementation.
+
 Observed on 2026-09-05 on Arch Linux using the 2.4 GHz receiver, USB
 `1038:1852`. Targeted HIDAPI enumeration reported five distinct HID paths and
 five entries. All five resolved to the same USB device parent. Manufacturer was
@@ -62,7 +69,8 @@ carries status, events, or another kind of data.
 The interface 3 conclusion is a structural inference, not verified SteelSeries
 protocol knowledge. Descriptors do not establish command formats, configuration
 semantics, persistence, acknowledgments, or safe values. No configuration
-commands have been implemented. The wired device's layout remains unverified;
+setting commands have been implemented. Phase 3's battery query is documented
+separately. The wired device's layout remains unverified;
 synthetic wired tests exercise ID handling only.
 
 ## Sources and reproducibility

@@ -21,6 +21,36 @@ def hid_backend(monkeypatch):
 
 
 @pytest.fixture
+def io_backend(hid_backend, monkeypatch):
+    """Opt-in mocked handle; feature reports and VID/PID opens remain absent."""
+    backend = Mock(spec_set=["enumerate", "device"])
+    device = Mock(spec_set=["open_path", "write", "read", "close"])
+    backend.enumerate.return_value = []
+    backend.device.return_value = device
+
+    def write(data):
+        assert data == b"\x00\xd2", "Only the battery query is allowed in I/O tests"
+        return len(data)
+
+    device.write.side_effect = write
+    device.read.return_value = [0xD2, 16]
+    monkeypatch.setitem(sys.modules, "hid", backend)
+    monkeypatch.setitem(sys.modules, "hidraw", backend)
+    return backend, device
+
+
+@pytest.fixture
+def receiver_configuration(record):
+    return {
+        **record,
+        "interface_number": 3,
+        "usage_page": 0xFFC0,
+        "usage": 1,
+        "path": b"/dev/hidraw42",
+    }
+
+
+@pytest.fixture
 def record():
     return {
         "vendor_id": 0x1038,

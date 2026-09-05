@@ -1,5 +1,6 @@
 """HID metadata and discovery contracts, independent of vendor protocols."""
 
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import NotRequired, Protocol, TypedDict
 
@@ -63,3 +64,17 @@ class HidDiscovery(Protocol):
     def enumerate(
         self, vendor_id: int = 0, product_id: int = 0
     ) -> tuple[HidInterface, ...]: ...
+
+
+class HidConnection(Protocol):
+    """Report I/O on a single already-selected interface."""
+
+    def write_output(self, payload: bytes, *, report_id: int = 0) -> None: ...
+
+    def read_input(self, max_length: int, *, timeout_ms: int) -> bytes: ...
+
+    def close(self) -> None: ...
+
+
+class HidTransport(HidDiscovery, Protocol):
+    def open_path(self, path: bytes | str) -> AbstractContextManager[HidConnection]: ...

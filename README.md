@@ -1,8 +1,9 @@
 # aerox5-control
 
 An independent Linux utility for the SteelSeries Aerox 5 Wireless. The current
-implementation provides **read-only HID enumeration and descriptor inspection**
-using python-hidapi and Linux's cached sysfs descriptors.
+implementation provides **HID discovery, cached descriptor inspection, and a
+battery query** using python-hidapi. The battery query is the only implemented
+device command; it does not change settings.
 It has no dependency on rivalcfg and does not install, import, invoke, or bundle it.
 
 ## Development setup
@@ -50,7 +51,8 @@ paths as UTF-8 with backslash escapes for undecodable bytes.
 
 Entries are not deduplicated by product ID, serial number, or path. A device can
 have multiple HID interfaces, and an interface can have multiple collections.
-No interface is assumed to be the configuration interface. Receiver discovery
+Discovery preserves every interface. The separate battery command uses the
+confirmed receiver configuration interface described below. Receiver discovery
 does not prove that its paired mouse is connected or awake.
 
 Exit status is 0 for successful enumeration, including an empty result; 1 for a
@@ -94,23 +96,66 @@ than 4096 bytes are rejected without returning partial sizes.
 
 Configuration candidates are inferred from vendor-specific application
 collections with output or feature reports. This is explicitly uncertain and
-does not select an interface for communication. See
+does not select an interface for communication. The battery command separately
+uses the confirmed standard receiver interface. See
 [the observed receiver interfaces](docs/hid-interfaces.md) and
 [captured descriptor fixtures](tests/fixtures/aerox5_receiver.json).
 
+## Battery query: manual hardware test
+
+With the standard 2.4 GHz receiver connected and the mouse awake, run as your
+normal desktop user:
+
+```sh
+.venv/bin/aerox5-control-cli battery
+```
+
+After activating `.venv`, the equivalent command is `aerox5-control-cli battery`.
+This command intentionally sends one documented battery query. It has not been
+run against the physical mouse during implementation or automated tests.
+
+The command enumerates only `1038:1852`, selects interface 3 with usage page
+`0xffc0` and usage `0x0001`, and opens that returned path. It does not hardcode
+`/dev/hidraw9`, access the other interfaces, or query the wired device. Missing
+metadata, conflicting records, or multiple matching receivers result in
+unavailable status before any interface is opened.
+
+The exact HIDAPI output buffer is **`00 D2`**, two bytes total. `00` is HIDAPI's
+synthetic ID prefix; `D2` is the complete query payload. There are no additional
+padding bytes. The command performs one input read on the same handle with a
+1000 ms timeout, then closes the handle. It performs no retries or feature-report
+operations. See [the protocol specification](docs/battery-protocol.md).
+
+Successful output is:
+
+```text
+Battery: 75%
+Charging: no
+```
+
+Charging is `yes` when the response's charging bit is set. If unavailable, stdout
+is exactly `Battery: unavailable`, a reason is written to stderr, and the exit
+status is 1. Missing/asleep devices, timeouts, malformed replies, invalid battery
+values, permission failures, and disconnects never become fabricated percentages.
+Successful queries exit with status 0. The normal user needs access to the
+selected hidraw node; permission failure is reported without elevating privileges
+or changing permissions. This phase installs no udev rules.
+
 ## Safety and architecture
 
-Only the selected backend's `enumerate(vendor_id, product_id)` is called. The
-application also reads cached sysfs metadata for matching devices. It never
-constructs a HID device handle, opens an interface, reads or sends reports,
-changes settings, or performs firmware operations. Importing the application
-and requesting CLI help do not import or initialize the HID backend.
+`inspect` only enumerates devices; `hid-info` additionally reads cached sysfs
+metadata. Neither opens a HID handle or requests/sends reports. Only the explicit
+`battery` command opens receiver interface 3 and sends `00 D2`. It never sends
+feature reports or any setting, save, reset, or firmware commands. Importing the
+application and requesting CLI help do not import or initialize the HID backend.
 
-The transport package contains generic HID enumeration and sysfs access. The
+The transport package contains generic HID enumeration, sysfs access, and managed
+output/input report I/O. It knows no Aerox command bytes. The
 `hid_descriptor` package parses bytes without I/O or Aerox protocol knowledge.
-The devices package contains the Aerox VID/PID mapping. Application services
-coordinate discovery/inspection; the CLI formats the results. Protocol encoding
-and GTK UI are reserved for later phases and are not dependencies of discovery.
+The protocol package constructs the battery payload and strictly decodes replies.
+The devices package owns Aerox interface selection and the battery transaction.
+Application services expose these operations; the CLI formats their results.
+GTK UI and settings remain future work.
 
 ## Checks
 
@@ -120,8 +165,9 @@ and GTK UI are reserved for later phases and are not dependencies of discovery.
 .venv/bin/ruff format --check .
 ```
 
-Every test receives strict mocks for both `hidraw` and `hid` before discovery can
-run. The mocks expose only enumeration; attempts to open devices or send reports
-fail. Descriptor tests use captured/static byte fixtures and temporary sysfs
-trees; every test redirects the default sysfs root into its temporary directory.
-Tests do not access physical HID devices or the real sysfs tree.
+Every test replaces both `hidraw` and `hid` before any backend can load. Discovery
+mocks expose only enumeration. Battery tests opt into a fake transport or strict
+mock handles that allow only exact-path open, output write, timed read, and close;
+the I/O fixture rejects any output other than `00 D2`. Descriptor tests use
+captured/static fixtures and temporary sysfs trees. Tests do not access physical
+HID devices or the real sysfs tree.

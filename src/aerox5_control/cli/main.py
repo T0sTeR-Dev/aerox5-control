@@ -5,7 +5,7 @@ import sys
 from collections.abc import Sequence
 
 from aerox5_control.application.hid_info import inspect_hid_descriptors
-from aerox5_control.application.services import inspect_interfaces
+from aerox5_control.application.services import get_battery, inspect_interfaces
 from aerox5_control.cli.hid_info import format_candidates, format_descriptor
 from aerox5_control.devices.aerox5 import Aerox5Interface
 from aerox5_control.transport.hidapi_backend import HidError
@@ -49,14 +49,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run discovery or report an error without requesting elevated access."""
     parser = argparse.ArgumentParser(
         prog="aerox5-control-cli",
-        description="Read-only discovery for the SteelSeries Aerox 5 Wireless.",
+        description="Discover the Aerox 5 Wireless and query its battery.",
     )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("inspect", help="enumerate all matching HID interfaces")
     commands.add_parser("hid-info", help="inspect cached HID report descriptors")
+    commands.add_parser("battery", help="query receiver interface 3 for battery status")
     args = parser.parse_args(argv)
 
     try:
+        if args.command == "battery":
+            status = get_battery()
+            if not status.available:
+                print("Battery: unavailable")
+                if status.reason:
+                    print(f"aerox5-control-cli: {status.reason}", file=sys.stderr)
+                return 1
+            print(f"Battery: {status.level}%")
+            print(f"Charging: {'yes' if status.charging else 'no'}")
+            return 0
         if args.command == "hid-info":
             return _hid_info()
         interfaces = inspect_interfaces()

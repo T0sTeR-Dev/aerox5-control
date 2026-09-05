@@ -1,1 +1,1 @@
-"""Generic, enumeration-only HID transport."""
+"""Generic HID discovery, cached metadata inspection, and explicit report I/O."""
