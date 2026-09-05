@@ -2,8 +2,8 @@
 
 An independent Linux utility for the SteelSeries Aerox 5 Wireless. The current
 implementation provides **HID discovery, cached descriptor inspection, device
-status, a battery query, and active polling-rate control** using python-hidapi.
-Polling rate is the only implemented setting; no save command is sent.
+status, a battery query, active polling-rate control, and DPI presets** using
+python-hidapi. Polling and DPI are separate operations; neither sends a save command.
 It has no dependency on rivalcfg and does not install, import, invoke, or bundle it.
 
 ## Development setup
@@ -175,6 +175,8 @@ exits 0, even when optional metadata is missing. `status` queries only the stand
 metadata. Neither opens a HID handle or requests/sends reports. The explicit
 `battery` and `status` commands open receiver interface 3 and send `00 D2`.
 `polling set` uses the same selection checks and sends only its polling request.
+`dpi set` sends only a sensitivity request, replacing 1-5 presets and selecting
+the first (index 0). It does not change polling rate.
 The application never sends feature reports, other setting commands, save,
 reset, or firmware commands. Importing the application and requesting CLI help
 do not import or initialize the HID backend.
@@ -182,9 +184,10 @@ do not import or initialize the HID backend.
 The transport package contains generic HID enumeration, sysfs access, and managed
 output/input report I/O. It knows no Aerox command bytes. The
 `hid_descriptor` package parses bytes without I/O or Aerox protocol knowledge.
-The protocol package encodes battery/polling requests and strictly decodes battery
-replies. The devices package owns Aerox interface selection, the transactions,
-structured device status, and polling request results with opaque readback bytes.
+The protocol package encodes battery/polling/DPI requests, contains the verified
+TrueMove Air lookup table, and strictly decodes battery replies. The devices
+package owns Aerox interface selection, the transactions, structured device
+status, and setting request results with opaque readback bytes.
 Application services expose these operations; the CLI formats their results.
 GTK UI and other settings remain future work.
 
@@ -232,9 +235,49 @@ completed; it does not establish that the mouse applied the setting.
 Invalid arguments exit 2 before hardware access. Selection, permission, write,
 readback, or close failures exit 1 with a diagnostic on stderr. After a write
 attempt the active rate may already have changed, even if readback fails; the
-CLI reports that uncertainty and sends no retry or rollback. The setting command
-has not been run against the physical mouse during development or tests. See
+CLI reports that uncertainty and sends no retry or rollback. The project owner
+has confirmed successful physical polling-rate tests. No hardware command was
+executed during DPI development or automated tests. See
 [the polling protocol and safety details](docs/polling-protocol.md).
+
+## DPI presets: first manual hardware test
+
+With the standard receiver connected and the mouse awake, run as your normal
+desktop user from the project directory:
+
+```sh
+.venv/bin/aerox5-control-cli dpi set 800
+```
+
+This replaces the preset list with a single 800-DPI preset and requests selection
+of index 0. For multiple presets or help:
+
+```sh
+.venv/bin/aerox5-control-cli dpi set 800 1600
+.venv/bin/aerox5-control-cli dpi set 400 800 1200 2400 3200
+.venv/bin/aerox5-control-cli dpi --help
+```
+
+Provide 1-5 integer values between 100 and 18000, in increments of 100. Input
+order and duplicates are preserved. Invalid values such as 850 are rejected
+without rounding, before HID discovery. The application uses an explicit
+TrueMove Air lookup table covering all 180 values, checked against pinned public
+protocol references. It does not use a simple `DPI / 100` byte conversion.
+
+The exact HIDAPI output for `dpi set 800` is `00 6D 01 00 09`: synthetic ID,
+wireless command, count, selected index, encoded value. No padding is added.
+The command sends one output report to dynamically selected receiver interface
+3, performs one read of up to 64 bytes with a 1000 ms timeout on the same handle,
+and closes. No save/persistence, retry, polling change, or other command is sent.
+
+Exit status 0 means the write/readback/close completed. Raw readback is retained
+for diagnostics and has no assigned acknowledgment or configuration semantics.
+The CLI reports requested values, not independently verified hardware state.
+There is no `dpi get`, arbitrary active-index selection, or locally cached DPI
+value in `status`. Invalid arguments exit 2; selection and I/O failures exit 1.
+After a write attempt, the CLI reports that DPI may have changed even if the
+readback fails. No DPI command was executed on the physical mouse during this
+implementation. See [the complete DPI protocol and mapping](docs/dpi-protocol.md).
 
 ## Checks
 
@@ -252,3 +295,6 @@ into a separate mock that permits only the four exact polling buffers above;
 complete call-sequence assertions exclude additional commands, save operations,
 and retries. Descriptor tests use captured/static fixtures and temporary sysfs
 trees. Tests do not access physical HID devices or the real sysfs tree.
+DPI tests use their own exact-packet allowlist and a separate reference fixture
+to verify every supported DPI value. Tests never install or execute reference
+projects and need no network access.

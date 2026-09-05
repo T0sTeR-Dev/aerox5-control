@@ -59,6 +59,28 @@ def polling_backend(io_backend):
 
 
 @pytest.fixture
+def dpi_backend(io_backend):
+    """Only the explicit DPI packets used by tests; no other command can pass."""
+    backend, device = io_backend
+
+    def write(data):
+        assert data in (
+            b"\x00\x6d\x01\x00\x09",
+            b"\x00\x6d\x02\x00\x09\x12",
+            b"\x00\x6d\x05\x00\x04\x09\x0d\x1b\x26",
+            b"\x00\x6d\x01\x00\x00",
+            b"\x00\x6d\x01\x00\xd6",
+            b"\x00\x6d\x02\x00\x12\x09",
+            b"\x00\x6d\x02\x00\x51\x6b",
+        ), "Only known DPI test packets are allowed; no save/polling/other commands"
+        return len(data)
+
+    device.write.side_effect = write
+    device.read.return_value = [0] * 64  # Opaque synthetic readback, not an ACK.
+    return backend, device
+
+
+@pytest.fixture
 def receiver_configuration(record):
     return {
         **record,

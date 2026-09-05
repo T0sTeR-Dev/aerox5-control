@@ -1,5 +1,6 @@
 """Identify Aerox 5 Wireless interfaces using known standard USB IDs."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from aerox5_control.protocol.aerox5 import (
@@ -7,7 +8,9 @@ from aerox5_control.protocol.aerox5 import (
     BatteryStatus,
     battery_query_payload,
     decode_battery_response,
+    encode_dpi_presets,
     encode_polling_rate,
+    validate_dpi_presets,
 )
 from aerox5_control.transport.hidapi_backend import (
     HidError,
@@ -32,6 +35,7 @@ RECEIVER_CONFIGURATION_USAGE_PAGE = 0xFFC0
 RECEIVER_CONFIGURATION_USAGE = 0x0001
 BATTERY_READ_TIMEOUT_MS = 1000
 POLLING_READBACK_TIMEOUT_MS = 1000
+DPI_READBACK_TIMEOUT_MS = 1000
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +76,29 @@ class PollingRateResult:
     def completed(self) -> bool:
         """The write, readback, and close completed without a transport error."""
         return self.error is None and self.readback is not None
+
+
+@dataclass(frozen=True, slots=True)
+class DpiPresetsResult:
+    """Requested presets and opaque readback, not confirmed hardware state."""
+
+    requested_presets: tuple[int, ...]
+    interface: Aerox5Interface | None
+    write_attempted: bool
+    readback: bytes | None
+    error: str | None = None
+
+    @property
+    def completed(self) -> bool:
+        return self.error is None and self.readback is not None
+
+
+@dataclass(frozen=True, slots=True)
+class _SettingWriteResult:
+    interface: Aerox5Interface | None
+    write_attempted: bool
+    readback: bytes | None
+    error: str | None
 
 
 class ReceiverSelectionError(HidError):
@@ -149,6 +176,36 @@ class Aerox5Receiver:
     def set_polling_rate(self, rate_hz: int) -> PollingRateResult:
         """Validate before discovery, write once, read once, and never save/retry."""
         payload = encode_polling_rate(rate_hz)
+        result = self._write_setting(
+            payload, operation="polling", timeout_ms=POLLING_READBACK_TIMEOUT_MS
+        )
+        return PollingRateResult(
+            requested_rate_hz=rate_hz,
+            interface=result.interface,
+            write_attempted=result.write_attempted,
+            readback=result.readback,
+            error=result.error,
+        )
+
+    def set_dpi_presets(self, presets: Sequence[int]) -> DpiPresetsResult:
+        """Set a validated list with index 0; no other command or persistence."""
+        values = validate_dpi_presets(presets)
+        payload = encode_dpi_presets(values)
+        result = self._write_setting(
+            payload, operation="DPI", timeout_ms=DPI_READBACK_TIMEOUT_MS
+        )
+        return DpiPresetsResult(
+            requested_presets=values,
+            interface=result.interface,
+            write_attempted=result.write_attempted,
+            readback=result.readback,
+            error=result.error,
+        )
+
+    def _write_setting(
+        self, payload: bytes, *, operation: str, timeout_ms: int
+    ) -> _SettingWriteResult:
+        """Only called with a validated payload from a documented setting encoder."""
         selected = None
         write_attempted = False
         readback = None
@@ -160,7 +217,7 @@ class Aerox5Receiver:
                 connection.write_output(payload, report_id=0)
                 response = connection.read_input(
                     CONFIGURATION_INPUT_REPORT_SIZE,
-                    timeout_ms=POLLING_READBACK_TIMEOUT_MS,
+                    timeout_ms=timeout_ms,
                 )
                 # Enforce the same structural contract for injected transports.
                 # No header, acknowledgment, or rate semantics are assigned.
@@ -168,14 +225,13 @@ class Aerox5Receiver:
                     not isinstance(response, bytes)
                     or len(response) > CONFIGURATION_INPUT_REPORT_SIZE
                 ):
-                    raise HidOperationError("Malformed polling readback")
+                    raise HidOperationError(f"Malformed {operation} readback")
                 if not response:
-                    raise HidReadTimeout("Polling readback timed out")
+                    raise HidReadTimeout(f"{operation.capitalize()} readback timed out")
                 readback = response
         except (HidError, OSError) as error:
             error_message = str(error)
-        return PollingRateResult(
-            requested_rate_hz=rate_hz,
+        return _SettingWriteResult(
             interface=selected,
             write_attempted=write_attempted,
             readback=readback,

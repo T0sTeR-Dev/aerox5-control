@@ -1,9 +1,12 @@
-"""Discovery, receiver status, and explicitly requested active polling changes."""
+"""Discovery, receiver status, and explicit active polling/DPI requests."""
+
+from collections.abc import Sequence
 
 from aerox5_control.devices.aerox5 import (
     Aerox5Interface,
     Aerox5Receiver,
     Aerox5Status,
+    DpiPresetsResult,
     PollingRateResult,
     discover_aerox5,
 )
@@ -41,3 +44,12 @@ def set_polling_rate(
     if transport is None:
         transport = HidApiTransport()
     return Aerox5Receiver(transport).set_polling_rate(rate_hz)
+
+
+def set_dpi_presets(
+    presets: Sequence[int], transport: HidTransport | None = None
+) -> DpiPresetsResult:
+    """Validate and set DPI presets once, without saving or changing polling."""
+    if transport is None:
+        transport = HidApiTransport()
+    return Aerox5Receiver(transport).set_dpi_presets(presets)

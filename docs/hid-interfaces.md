@@ -3,11 +3,11 @@
 This document records Phase 2's descriptor-only observations. For Phase 3, the
 project owner confirmed interface 3 as the standard receiver's configuration
 interface, supported by public battery-query research. The implementation now
-uses that selection for the [documented battery query](battery-protocol.md) and
-the separate [active polling-rate operation](polling-protocol.md).
-The project owner subsequently confirmed that the battery query works on the
-physical mouse. No real query was run while implementing the status command or
-running its tests.
+uses that selection for the [documented battery query](battery-protocol.md),
+[active polling-rate operation](polling-protocol.md), and
+[DPI preset operation](dpi-protocol.md).
+The project owner subsequently confirmed battery and polling control on the
+physical mouse. No real command was run while implementing DPI or running tests.
 
 Observed on 2026-09-05 on Arch Linux using the 2.4 GHz receiver, USB
 `1038:1852`. Targeted HIDAPI enumeration reported five distinct HID paths and
@@ -36,8 +36,8 @@ are **unnumbered**, with no report ID byte on the wire.
 | 4 | `/dev/hidraw10` | `0xffc1 / 0x0001` | Vendor-specific | 21 | 64 | — | — |
 
 The HID path numbers can change after reconnecting. Descriptor inspection uses
-enumeration metadata; `battery`, `status`, and `polling set` require interface 3
-and open its enumerated path.
+enumeration metadata; `battery`, `status`, `polling set`, and `dpi set` require
+interface 3 and open its enumerated path.
 
 Interface 0 describes eight buttons, 16-bit X/Y movement, an 8-bit wheel,
 8-bit Consumer AC Pan, and five bytes on vendor page `0xffc1`: 96 bits total.
@@ -72,8 +72,8 @@ carries status, events, or another kind of data.
 The Phase 2 interface 3 conclusion was a structural inference. Subsequent public
 research and the owner's successful battery test confirm it for that transaction.
 Descriptors alone do not establish command formats, configuration
-semantics, persistence, acknowledgments, or safe values. Active polling rate is
-now the only implemented setting, based on the separately documented protocol.
+semantics, persistence, acknowledgments, or safe values. Active polling rate and
+DPI presets are the implemented settings, with separately documented protocols.
 Phase 3's battery query is documented separately. The wired device's layout
 remains unverified; synthetic wired tests exercise ID handling only.
 

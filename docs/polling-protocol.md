@@ -2,9 +2,9 @@
 
 Scope: the standard 2.4 GHz receiver `1038:1852`, USB/HID interface 3, usage page
 `0xffc0`, usage `0x0001`. The project owner has confirmed this configuration
-interface and the existing battery query on the physical mouse. Polling control
-has **not** been executed against the physical mouse during implementation or
-tests. It changes only the active polling rate and sends no save command.
+interface, battery query, and polling control on the physical mouse. No hardware
+commands were executed while implementing DPI or running automated tests.
+Polling control changes only the active polling rate and sends no save command.
 
 ## Encoding and evidence
 
@@ -36,7 +36,7 @@ a need for padding. The descriptor's 64-byte output layout alone is not used to
 invent additional bytes. No feature-report operation is used.
 
 The wired command exists only as an encoding constant; there is no wired polling
-execution path. The only setting opcode the application emits is wireless `6b`.
+execution path. This polling operation emits only the wireless `6b` opcode.
 It does not send save `11` / wireless `51`, persist to onboard memory, reset,
 initialize other settings, or issue battery/status queries around this operation.
 No persistence across reconnects or power cycles is promised.

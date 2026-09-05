@@ -9,12 +9,13 @@ from aerox5_control.application.services import (
     get_battery,
     get_status,
     inspect_interfaces,
+    set_dpi_presets,
     set_polling_rate,
 )
 from aerox5_control.cli.hid_info import format_candidates, format_descriptor
 from aerox5_control.cli.status import format_status
 from aerox5_control.devices.aerox5 import Aerox5Interface
-from aerox5_control.protocol.aerox5 import SUPPORTED_POLLING_RATES
+from aerox5_control.protocol.aerox5 import SUPPORTED_POLLING_RATES, validate_dpi_presets
 from aerox5_control.transport.hidapi_backend import HidError
 
 
@@ -56,7 +57,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run an explicit operation without requesting elevated access."""
     parser = argparse.ArgumentParser(
         prog="aerox5-control-cli",
-        description="Inspect Aerox 5 Wireless status or set its active polling rate.",
+        description="Inspect Aerox 5 Wireless or set active polling and DPI presets.",
     )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("inspect", help="enumerate all matching HID interfaces")
@@ -82,9 +83,30 @@ def main(argv: Sequence[str] | None = None) -> int:
     polling_set.add_argument(
         "rate_hz", type=int, choices=SUPPORTED_POLLING_RATES, help="polling rate in Hz"
     )
+    dpi = commands.add_parser(
+        "dpi",
+        help="set 1-5 DPI presets and select the first, without saving",
+        description=(
+            "Set 1-5 DPI presets from 100 through 18000 in steps of 100. "
+            "The first preset (index 0) is selected. "
+            "No save command, current-DPI query, or automatic retry is sent."
+        ),
+    )
+    dpi_commands = dpi.add_subparsers(dest="dpi_command", required=True)
+    dpi_set = dpi_commands.add_parser("set", help="replace the active DPI preset list")
+    dpi_set.add_argument(
+        "presets", type=int, nargs="+", metavar="DPI", help="1-5 DPI values, step 100"
+    )
     args = parser.parse_args(argv)
+    if args.command == "dpi":
+        try:
+            args.presets = validate_dpi_presets(args.presets)
+        except ValueError as error:
+            dpi_set.error(str(error))
 
     try:
+        if args.command == "dpi":
+            return _set_dpi_presets(args.presets)
         if args.command == "polling":
             return _set_polling_rate(args.rate_hz)
         if args.command == "status":
@@ -131,6 +153,25 @@ def _set_polling_rate(rate_hz: int) -> int:
         return 1
     print(f"Polling-rate request sent: {result.requested_rate_hz} Hz")
     print("Readback received; active rate unverified.")
+    return 0
+
+
+def _set_dpi_presets(presets: Sequence[int]) -> int:
+    result = set_dpi_presets(presets)
+    if not result.completed:
+        print(
+            f"aerox5-control-cli: DPI preset request failed: {result.error}",
+            file=sys.stderr,
+        )
+        if result.write_attempted:
+            print(
+                "The active DPI presets may have changed; no retry was sent.",
+                file=sys.stderr,
+            )
+        return 1
+    print(f"DPI preset request sent: {' / '.join(map(str, result.requested_presets))}")
+    print("Requested selected preset: 0 (first)")
+    print("Readback received; active DPI presets unverified.")
     return 0
 
 

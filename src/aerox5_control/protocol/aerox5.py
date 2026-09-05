@@ -1,6 +1,9 @@
-"""Documented Aerox 5 battery queries and active polling-rate encoding."""
+"""Documented Aerox 5 battery, active polling-rate, and DPI preset encoding."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass
+
+from aerox5_control.protocol.truemove_air import encode_dpi_value
 
 BATTERY_QUERY_WIRED = 0x92
 WIRELESS_COMMAND_FLAG = 0x40
@@ -11,6 +14,34 @@ POLLING_RATE_COMMAND_WIRED = 0x2B
 POLLING_RATE_COMMAND_WIRELESS = POLLING_RATE_COMMAND_WIRED | WIRELESS_COMMAND_FLAG
 _POLLING_RATE_VALUES = {1000: 0x00, 500: 0x01, 250: 0x02, 125: 0x03}
 SUPPORTED_POLLING_RATES = tuple(sorted(_POLLING_RATE_VALUES))
+DPI_COMMAND_WIRED = 0x2D
+DPI_COMMAND_WIRELESS = DPI_COMMAND_WIRED | WIRELESS_COMMAND_FLAG
+MAX_DPI_PRESETS = 5
+DPI_SELECTED_PRESET = 0
+
+
+def validate_dpi_presets(presets: Sequence[int]) -> tuple[int, ...]:
+    """Validate and snapshot an ordered list before any hardware access."""
+    if (
+        not isinstance(presets, Sequence)
+        or isinstance(presets, (str, bytes, bytearray))
+        or not 1 <= len(presets) <= MAX_DPI_PRESETS
+    ):
+        raise ValueError("Provide between 1 and 5 integer DPI presets")
+    values = tuple(presets)
+    if not 1 <= len(values) <= MAX_DPI_PRESETS:
+        raise ValueError("Provide between 1 and 5 integer DPI presets")
+    for value in values:
+        encode_dpi_value(value)
+    return values
+
+
+def encode_dpi_presets(presets: Sequence[int]) -> bytes:
+    """Encode command/count/index/values; select index 0 with no ID prefix."""
+    values = validate_dpi_presets(presets)
+    return bytes((DPI_COMMAND_WIRELESS, len(values), DPI_SELECTED_PRESET)) + bytes(
+        encode_dpi_value(value) for value in values
+    )
 
 
 def encode_polling_rate(rate_hz: int) -> bytes:
