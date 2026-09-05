@@ -6,7 +6,7 @@ from aerox5_control.gui.window import ControlWindow
 
 class AeroxApplication(Adw.Application):
     def __init__(self) -> None:
-        super().__init__(application_id="org.aerox5_control.Aerox5Control")
+        super().__init__(application_id="io.github.T0sTeR_Dev.Aerox5Control")
         GLib.set_application_name("Aerox 5 Control")
 
     def do_activate(self) -> None:

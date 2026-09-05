@@ -120,7 +120,8 @@ def discover_aerox5(transport: HidDiscovery) -> tuple[Aerox5Interface, ...]:
 def _is_configuration_interface(interface: HidInterface) -> bool:
     return (
         interface.vendor_id == STEELSERIES_VENDOR_ID
-        and interface.product_id in (
+        and interface.product_id
+        in (
             AEROX5_RECEIVER_PRODUCT_ID,
             AEROX5_WIRED_PRODUCT_ID,
         )
@@ -139,25 +140,21 @@ class Aerox5Receiver:
     def _configuration_interface(self, *, allow_wired: bool = True) -> Aerox5Interface:
         """Select a confirmed Aerox 5 configuration interface."""
         product_ids = (
-        (
-            AEROX5_RECEIVER_PRODUCT_ID,
-            AEROX5_WIRED_PRODUCT_ID,
-        )
-        if allow_wired
-        else (AEROX5_RECEIVER_PRODUCT_ID,)
-    )
-        
-        for product_id in  product_ids:
-            entries = self._transport.enumerate(
-                STEELSERIES_VENDOR_ID,
-                product_id
+            (
+                AEROX5_RECEIVER_PRODUCT_ID,
+                AEROX5_WIRED_PRODUCT_ID,
             )
+            if allow_wired
+            else (AEROX5_RECEIVER_PRODUCT_ID,)
+        )
+
+        for product_id in product_ids:
+            entries = self._transport.enumerate(STEELSERIES_VENDOR_ID, product_id)
 
             candidates = {
                 entry.path: entry
                 for entry in entries
-                if entry.product_id == product_id
-                and _is_configuration_interface(entry)
+                if entry.product_id == product_id and _is_configuration_interface(entry)
             }
 
             if len(candidates) > 1:
@@ -171,10 +168,7 @@ class Aerox5Receiver:
             path = next(iter(candidates))
             candidate = candidates[path]
 
-            if any(
-                entry.path == path and entry != candidate
-                for entry in entries
-            ):
+            if any(entry.path == path and entry != candidate for entry in entries):
                 raise ReceiverSelectionError(
                     "Conflicting metadata for the selected HID path"
                 )
@@ -184,9 +178,7 @@ class Aerox5Receiver:
                 connection=_CONNECTIONS[candidate.product_id],
             )
 
-        raise ReceiverSelectionError(
-            "Aerox 5 configuration interface not found"
-        )
+        raise ReceiverSelectionError("Aerox 5 configuration interface not found")
 
     def get_battery(self) -> BatteryStatus:
         return self.get_status().battery
@@ -197,9 +189,11 @@ class Aerox5Receiver:
         try:
             selected = self._configuration_interface()
             wireless = selected.hid.product_id == AEROX5_RECEIVER_PRODUCT_ID
-            
+
             with self._transport.open_path(selected.hid.path) as connection:
-                connection.write_output(battery_query_payload(wireless=wireless), report_id=0)
+                connection.write_output(
+                    battery_query_payload(wireless=wireless), report_id=0
+                )
                 response = connection.read_input(
                     BATTERY_RESPONSE_SIZE, timeout_ms=BATTERY_READ_TIMEOUT_MS
                 )
@@ -246,8 +240,8 @@ class Aerox5Receiver:
         readback = None
         error_message = None
         try:
-            selected = self._configuration_interface(allow_wired=False)            
-            
+            selected = self._configuration_interface(allow_wired=False)
+
             with self._transport.open_path(selected.hid.path) as connection:
                 write_attempted = True
                 connection.write_output(payload, report_id=0)

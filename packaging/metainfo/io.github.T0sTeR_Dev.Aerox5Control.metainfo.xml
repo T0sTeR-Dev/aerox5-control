@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.T0sTeR_Dev.Aerox5Control</id>
+
+  <name>Aerox 5 Control</name>
+  <summary>Configure the SteelSeries Aerox 5 Wireless on Linux</summary>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <developer id="io.github.t0ster-dev">
+    <name>T0sTeR-Dev</name>
+  </developer>
+
+  <description>
+    <p>
+      Aerox 5 Control is an independent Linux utility for the SteelSeries
+      Aerox 5 Wireless mouse.
+    </p>
+    <p>
+      It provides a native GTK4 and Libadwaita interface for viewing device
+      status, battery level and charging state, and for configuring DPI
+      presets and polling rate over the 2.4 GHz receiver.
+    </p>
+    <p>
+      Wired USB mode supports device status, battery level and charging
+      information in version 0.1.0.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">
+    io.github.T0sTeR_Dev.Aerox5Control.desktop
+  </launchable>
+
+  <provides>
+    <binary>aerox5-control</binary>
+    <binary>aerox5-control-cli</binary>
+  </provides>
+
+  <url type="homepage">https://github.com/T0sTeR-Dev/aerox5-control</url>
+  <url type="bugtracker">https://github.com/T0sTeR-Dev/aerox5-control/issues</url>
+
+  <content_rating type="oars-1.1" />
+
+  <releases>
+    <release version="0.1.0" date="2026-09-05">
+      <description>
+        <p>Initial release of Aerox 5 Control.</p>
+        <ul>
+          <li>Native GTK4 and Libadwaita graphical interface</li>
+          <li>Command-line interface</li>
+          <li>2.4 GHz and wired USB device detection</li>
+          <li>Battery and charging status</li>
+          <li>DPI preset configuration over 2.4 GHz</li>
+          <li>Polling-rate configuration over 2.4 GHz</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+</component>

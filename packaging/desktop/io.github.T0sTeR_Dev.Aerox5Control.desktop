@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Aerox 5 Control
+Comment=Configure the SteelSeries Aerox 5 Wireless on Linux
+Exec=aerox5-control
+Icon=io.github.T0sTeR_Dev.Aerox5Control
+Terminal=false
+Categories=Settings;HardwareSettings;
+Keywords=SteelSeries;Aerox;Mouse;DPI;Polling;
+StartupNotify=true

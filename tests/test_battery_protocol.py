@@ -84,11 +84,10 @@ def test_padded_battery_response_is_rejected():
     assert not status.available
     assert "unexpected length" in status.reason
 
+
 def test_wired_command_and_exact_hidapi_buffer():
     assert battery_query_payload(wireless=False) == b"\x92"
-    assert encode_output_report(
-        battery_query_payload(wireless=False)
-    ) == b"\x00\x92"
+    assert encode_output_report(battery_query_payload(wireless=False)) == b"\x00\x92"
 
 
 @pytest.mark.parametrize(

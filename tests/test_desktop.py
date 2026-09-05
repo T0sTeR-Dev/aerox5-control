@@ -20,7 +20,10 @@ def test_disconnected_refresh_uses_only_restricted_discovery(hid_backend):
     assert overview.battery == overview.charging == "Unavailable"
     assert overview.vendor_id == overview.product_id == "Unavailable"
     assert "Refresh" in overview.message
-    assert hid_backend.mock_calls == [call.enumerate(0x1038, 0x1852), call.enumerate(0x1038, 0x1854)]
+    assert hid_backend.mock_calls == [
+        call.enumerate(0x1038, 0x1852),
+        call.enumerate(0x1038, 0x1854),
+    ]
 
 
 @pytest.mark.parametrize(

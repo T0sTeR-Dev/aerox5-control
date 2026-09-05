@@ -7,12 +7,37 @@ name = "aerox5-control"
 version = "0.1.0"
 description = "Independent Linux discovery and configuration utility for the Aerox 5 Wireless"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = ["hidapi>=0.14"]
+authors = [
+    { name = "T0sTeR-Dev" },
+]
+keywords = [
+    "steelseries",
+    "aerox",
+    "mouse",
+    "linux",
+    "hid",
+    "gtk",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: X11 Applications :: GTK",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Hardware",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.11"]
 gui = ["PyGObject>=3.46"]
+
+[project.urls]
+Homepage = "https://github.com/T0sTeR-Dev/aerox5-control"
+Repository = "https://github.com/T0sTeR-Dev/aerox5-control"
+Issues = "https://github.com/T0sTeR-Dev/aerox5-control/issues"
 
 [project.scripts]
 aerox5-control-cli = "aerox5_control.cli.main:main"

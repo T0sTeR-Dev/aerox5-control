@@ -19,9 +19,7 @@ class FakeTransport:
         failure=None,
         expected_payload=b"\xd2",
     ):
-        self.entries = tuple(
-           HidInterface.from_enumeration(entry) for entry in entries
-        )
+        self.entries = tuple(HidInterface.from_enumeration(entry) for entry in entries)
         self.response = response
         self.failure = failure
         self.expected_payload = expected_payload
@@ -112,7 +110,10 @@ def test_unsupported_metadata_never_opens_or_writes(
 ):
     transport = FakeTransport([{**receiver_configuration, field: value}])
     assert not Aerox5Receiver(transport).get_battery().available
-    assert transport.calls == [("enumerate", 0x1038, 0x1852), ("enumerate", 0x1038, 0x1854)]
+    assert transport.calls == [
+        ("enumerate", 0x1038, 0x1852),
+        ("enumerate", 0x1038, 0x1854),
+    ]
 
 
 def test_multiple_receivers_do_not_trigger_queries(receiver_configuration):
@@ -168,6 +169,7 @@ def test_device_construction_does_not_touch_transport(receiver_configuration):
     Aerox5Receiver(transport)
     assert transport.calls == []
 
+
 def test_wired_fallback_uses_wired_battery_command(receiver_configuration):
     wired_configuration = {
         **receiver_configuration,
@@ -199,6 +201,7 @@ def test_wired_fallback_uses_wired_battery_command(receiver_configuration):
         ("read", 2, 1000),
         ("close",),
     ]
+
 
 def test_wireless_receiver_is_preferred_when_both_are_available(
     receiver_configuration,

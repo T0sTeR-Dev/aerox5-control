@@ -158,7 +158,10 @@ def test_status_never_opens_unsupported_interfaces(
     hid_backend.enumerate.return_value = [{**receiver_configuration, field: value}]
     assert main(["status"]) == 1
     assert capsys.readouterr().out == "Device: unavailable\nBattery: unavailable\n"
-    assert hid_backend.mock_calls == [call.enumerate(0x1038, 0x1852), call.enumerate(0x1038, 0x1854)]
+    assert hid_backend.mock_calls == [
+        call.enumerate(0x1038, 0x1852),
+        call.enumerate(0x1038, 0x1854),
+    ]
 
 
 @pytest.mark.parametrize(

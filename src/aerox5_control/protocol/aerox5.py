@@ -74,9 +74,7 @@ def battery_query_payload(*, wireless: bool = True) -> bytes:
     return bytes((command,))
 
 
-def decode_battery_response(
-    response: bytes, *, wireless: bool = True
-) -> BatteryStatus:
+def decode_battery_response(response: bytes, *, wireless: bool = True) -> BatteryStatus:
     """Decode a two-byte wired or wireless battery response; never clamp."""
     if not isinstance(response, bytes):
         return BatteryStatus.unavailable("Malformed battery response type")
@@ -86,9 +84,7 @@ def decode_battery_response(
         return BatteryStatus.unavailable("Battery response has an unexpected length")
     if response[:2] == b"\x40\xff":
         return BatteryStatus.unavailable("Mouse is unavailable/asleep/off")
-    expected_command = (
-    BATTERY_QUERY_WIRELESS if wireless else BATTERY_QUERY_WIRED
-)
+    expected_command = BATTERY_QUERY_WIRELESS if wireless else BATTERY_QUERY_WIRED
     if response[0] != expected_command:
         return BatteryStatus.unavailable("Unexpected battery response header")
     value = response[1]
