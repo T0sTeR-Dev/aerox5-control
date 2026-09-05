@@ -11,10 +11,20 @@ from aerox5_control.transport.interfaces import HidInterface
 
 
 class FakeTransport:
-    def __init__(self, entries, response=b"\xd2\x10", *, failure=None):
-        self.entries = tuple(HidInterface.from_enumeration(entry) for entry in entries)
+    def __init__(
+        self,
+        entries,
+        response=b"\xd2\x10",
+        *,
+        failure=None,
+        expected_payload=b"\xd2",
+    ):
+        self.entries = tuple(
+           HidInterface.from_enumeration(entry) for entry in entries
+        )
         self.response = response
         self.failure = failure
+        self.expected_payload = expected_payload
         self.calls = []
 
     def _fail(self, stage):
@@ -36,7 +46,7 @@ class FakeTransport:
             self.close()
 
     def write_output(self, payload, *, report_id=0):
-        assert payload == b"\xd2" and report_id == 0
+        assert payload == self.expected_payload and report_id == 0
         self.calls.append(("write", payload, report_id))
         self._fail("write")
 
@@ -76,7 +86,7 @@ def test_routes_only_to_configuration_interface_with_dynamic_path(
         ("enumerate", 0x1038, 0x1852),
         ("open", b"/dev/hidraw42"),
         ("write", b"\xd2", 0),
-        ("read", 64, 1000),
+        ("read", 2, 1000),
         ("close",),
     ]
 
@@ -85,7 +95,6 @@ def test_routes_only_to_configuration_interface_with_dynamic_path(
     ("field", "value"),
     [
         ("vendor_id", 0),
-        ("product_id", 0x1854),
         ("product_id", 0x185C),
         ("interface_number", 0),
         ("interface_number", 1),
@@ -103,7 +112,7 @@ def test_unsupported_metadata_never_opens_or_writes(
 ):
     transport = FakeTransport([{**receiver_configuration, field: value}])
     assert not Aerox5Receiver(transport).get_battery().available
-    assert transport.calls == [("enumerate", 0x1038, 0x1852)]
+    assert transport.calls == [("enumerate", 0x1038, 0x1852), ("enumerate", 0x1038, 0x1854)]
 
 
 def test_multiple_receivers_do_not_trigger_queries(receiver_configuration):
@@ -158,3 +167,63 @@ def test_device_construction_does_not_touch_transport(receiver_configuration):
     transport = FakeTransport([receiver_configuration])
     Aerox5Receiver(transport)
     assert transport.calls == []
+
+def test_wired_fallback_uses_wired_battery_command(receiver_configuration):
+    wired_configuration = {
+        **receiver_configuration,
+        "product_id": 0x1854,
+        "path": b"/dev/hidraw77",
+    }
+
+    transport = FakeTransport(
+        [wired_configuration],
+        response=b"\x92\x90",
+        expected_payload=b"\x92",
+    )
+
+    status = Aerox5Receiver(transport).get_status()
+
+    assert status.battery.level == 75
+    assert status.battery.charging is True
+
+    assert status.interface is not None
+    assert status.interface.hid.product_id == 0x1854
+    assert status.interface.hid.interface_number == 3
+    assert status.interface.connection == "wired"
+
+    assert transport.calls == [
+        ("enumerate", 0x1038, 0x1852),
+        ("enumerate", 0x1038, 0x1854),
+        ("open", b"/dev/hidraw77"),
+        ("write", b"\x92", 0),
+        ("read", 2, 1000),
+        ("close",),
+    ]
+
+def test_wireless_receiver_is_preferred_when_both_are_available(
+    receiver_configuration,
+):
+    wired_configuration = {
+        **receiver_configuration,
+        "product_id": 0x1854,
+        "path": b"/dev/wired",
+    }
+
+    transport = FakeTransport(
+        [wired_configuration, receiver_configuration],
+    )
+
+    status = Aerox5Receiver(transport).get_status()
+
+    assert status.battery.available
+    assert status.interface is not None
+    assert status.interface.hid.product_id == 0x1852
+    assert status.interface.connection == "2.4 GHz"
+
+    assert transport.calls == [
+        ("enumerate", 0x1038, 0x1852),
+        ("open", b"/dev/hidraw42"),
+        ("write", b"\xd2", 0),
+        ("read", 2, 1000),
+        ("close",),
+    ]

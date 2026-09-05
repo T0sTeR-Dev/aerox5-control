@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from aerox5_control.protocol.aerox5 import (
+    BATTERY_RESPONSE_SIZE,
     CONFIGURATION_INPUT_REPORT_SIZE,
     BatteryStatus,
     battery_query_payload,
@@ -116,10 +117,13 @@ def discover_aerox5(transport: HidDiscovery) -> tuple[Aerox5Interface, ...]:
     )
 
 
-def _is_receiver_configuration(interface: HidInterface) -> bool:
+def _is_configuration_interface(interface: HidInterface) -> bool:
     return (
         interface.vendor_id == STEELSERIES_VENDOR_ID
-        and interface.product_id == AEROX5_RECEIVER_PRODUCT_ID
+        and interface.product_id in (
+            AEROX5_RECEIVER_PRODUCT_ID,
+            AEROX5_WIRED_PRODUCT_ID,
+        )
         and interface.interface_number == RECEIVER_CONFIGURATION_INTERFACE
         and interface.usage_page == RECEIVER_CONFIGURATION_USAGE_PAGE
         and interface.usage == RECEIVER_CONFIGURATION_USAGE
@@ -127,32 +131,61 @@ def _is_receiver_configuration(interface: HidInterface) -> bool:
 
 
 class Aerox5Receiver:
-    """Use only the confirmed standard receiver configuration interface."""
+    """Use only the confirmed Aerox 5 configuration interface."""
 
     def __init__(self, transport: HidTransport) -> None:
         self._transport = transport
 
-    def _configuration_interface(self) -> Aerox5Interface:
-        """Share strict selection across queries and settings, without opening."""
-        entries = self._transport.enumerate(
-            STEELSERIES_VENDOR_ID, AEROX5_RECEIVER_PRODUCT_ID
+    def _configuration_interface(self, *, allow_wired: bool = True) -> Aerox5Interface:
+        """Select a confirmed Aerox 5 configuration interface."""
+        product_ids = (
+        (
+            AEROX5_RECEIVER_PRODUCT_ID,
+            AEROX5_WIRED_PRODUCT_ID,
         )
-        candidates = {
-            entry.path: entry for entry in entries if _is_receiver_configuration(entry)
-        }
-        if not candidates:
-            raise ReceiverSelectionError("Receiver configuration interface not found")
-        if len(candidates) != 1:
-            raise ReceiverSelectionError(
-                "Multiple receiver configuration interfaces found"
+        if allow_wired
+        else (AEROX5_RECEIVER_PRODUCT_ID,)
+    )
+        
+        for product_id in  product_ids:
+            entries = self._transport.enumerate(
+                STEELSERIES_VENDOR_ID,
+                product_id
             )
-        path = next(iter(candidates))
-        if any(entry.path == path and entry != candidates[path] for entry in entries):
-            raise ReceiverSelectionError(
-                "Conflicting metadata for the selected HID path"
+
+            candidates = {
+                entry.path: entry
+                for entry in entries
+                if entry.product_id == product_id
+                and _is_configuration_interface(entry)
+            }
+
+            if len(candidates) > 1:
+                raise ReceiverSelectionError(
+                    "Multiple Aerox 5 configuration interfaces found"
+                )
+
+            if not candidates:
+                continue
+
+            path = next(iter(candidates))
+            candidate = candidates[path]
+
+            if any(
+                entry.path == path and entry != candidate
+                for entry in entries
+            ):
+                raise ReceiverSelectionError(
+                    "Conflicting metadata for the selected HID path"
+                )
+
+            return Aerox5Interface(
+                hid=candidate,
+                connection=_CONNECTIONS[candidate.product_id],
             )
-        return Aerox5Interface(
-            hid=candidates[path], connection=_CONNECTIONS[AEROX5_RECEIVER_PRODUCT_ID]
+
+        raise ReceiverSelectionError(
+            "Aerox 5 configuration interface not found"
         )
 
     def get_battery(self) -> BatteryStatus:
@@ -163,12 +196,14 @@ class Aerox5Receiver:
         selected = None
         try:
             selected = self._configuration_interface()
+            wireless = selected.hid.product_id == AEROX5_RECEIVER_PRODUCT_ID
+            
             with self._transport.open_path(selected.hid.path) as connection:
-                connection.write_output(battery_query_payload(), report_id=0)
+                connection.write_output(battery_query_payload(wireless=wireless), report_id=0)
                 response = connection.read_input(
-                    CONFIGURATION_INPUT_REPORT_SIZE, timeout_ms=BATTERY_READ_TIMEOUT_MS
+                    BATTERY_RESPONSE_SIZE, timeout_ms=BATTERY_READ_TIMEOUT_MS
                 )
-            battery = decode_battery_response(response)
+            battery = decode_battery_response(response, wireless=wireless)
         except (HidError, OSError) as error:
             battery = BatteryStatus.unavailable(str(error))
         return Aerox5Status(interface=selected, battery=battery)
@@ -211,7 +246,8 @@ class Aerox5Receiver:
         readback = None
         error_message = None
         try:
-            selected = self._configuration_interface()
+            selected = self._configuration_interface(allow_wired=False)            
+            
             with self._transport.open_path(selected.hid.path) as connection:
                 write_attempted = True
                 connection.write_output(payload, report_id=0)

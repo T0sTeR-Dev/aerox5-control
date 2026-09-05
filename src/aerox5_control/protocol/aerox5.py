@@ -68,30 +68,28 @@ class BatteryStatus:
         return cls(reason=reason)
 
 
-def battery_query_payload() -> bytes:
-    """One command byte; the generic HID adapter adds the synthetic ID byte."""
-    return bytes((BATTERY_QUERY_WIRELESS,))
+def battery_query_payload(*, wireless: bool = True) -> bytes:
+    """Encode the battery command without the synthetic HIDAPI report-ID prefix."""
+    command = BATTERY_QUERY_WIRELESS if wireless else BATTERY_QUERY_WIRED
+    return bytes((command,))
 
 
-def decode_battery_response(response: bytes) -> BatteryStatus:
-    """Decode the second byte of a D2 reply; reject invalid levels, never clamp.
-
-    Accept the meaningful two bytes, or a full 64-byte input report only when
-    every trailing byte is zero. No synthetic HIDAPI prefix is removed on input.
-    """
+def decode_battery_response(
+    response: bytes, *, wireless: bool = True
+) -> BatteryStatus:
+    """Decode a two-byte wired or wireless battery response; never clamp."""
     if not isinstance(response, bytes):
         return BatteryStatus.unavailable("Malformed battery response type")
     if not response:
         return BatteryStatus.unavailable("No battery response; mouse may be asleep/off")
-    if len(response) not in (BATTERY_RESPONSE_SIZE, CONFIGURATION_INPUT_REPORT_SIZE):
+    if len(response) != BATTERY_RESPONSE_SIZE:
         return BatteryStatus.unavailable("Battery response has an unexpected length")
-    if any(response[BATTERY_RESPONSE_SIZE:]):
-        return BatteryStatus.unavailable(
-            "Battery response has unexpected trailing data"
-        )
     if response[:2] == b"\x40\xff":
         return BatteryStatus.unavailable("Mouse is unavailable/asleep/off")
-    if response[0] != BATTERY_QUERY_WIRELESS:
+    expected_command = (
+    BATTERY_QUERY_WIRELESS if wireless else BATTERY_QUERY_WIRED
+)
+    if response[0] != expected_command:
         return BatteryStatus.unavailable("Unexpected battery response header")
     value = response[1]
     level = ((value & 0x7F) - 1) * 5

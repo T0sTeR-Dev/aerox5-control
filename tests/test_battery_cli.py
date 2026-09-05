@@ -24,7 +24,7 @@ def test_battery_command(io_backend, receiver_configuration, capsys, value, char
         call.device(),
         call.device().open_path(b"/dev/hidraw42"),
         call.device().write(b"\x00\xd2"),
-        call.device().read(64, 1000),
+        call.device().read(2, 1000),
         call.device().close(),
     ]
 
@@ -61,7 +61,7 @@ def test_permission_failure_is_actionable_without_root(
 def test_no_receiver_never_opens_device(hid_backend, capsys):
     assert main(["battery"]) == 1
     assert capsys.readouterr().out == "Battery: unavailable\n"
-    assert hid_backend.mock_calls == [call.enumerate(0x1038, 0x1852)]
+    assert hid_backend.mock_calls == [call.enumerate(0x1038, 0x1852), call.enumerate(0x1038, 0x1854)]
 
 
 def test_discovery_does_not_query_battery(io_backend, receiver_configuration, capsys):

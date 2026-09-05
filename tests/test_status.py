@@ -17,7 +17,6 @@ from aerox5_control.transport.hidapi_backend import HidApiTransport
         ([0xD2, 0x89], 40, True),
         ([0xD2, 1], 0, False),
         ([0xD2, 0x95], 100, True),
-        ([0xD2, 16] + [0] * 62, 75, False),
     ],
 )
 def test_status_queries_only_selected_interface_once(
@@ -57,7 +56,7 @@ def test_status_queries_only_selected_interface_once(
         call.device(),
         call.device().open_path(b"/dev/hidraw42"),
         call.device().write(b"\x00\xd2"),
-        call.device().read(64, 1000),
+        call.device().read(2, 1000),
         call.device().close(),
     ]
 
@@ -98,7 +97,7 @@ def test_invalid_response_keeps_identity_but_not_battery_or_charging(
     if response == []:
         assert "timed out" in output.err
     device.write.assert_called_once_with(b"\x00\xd2")
-    device.read.assert_called_once_with(64, 1000)
+    device.read.assert_called_once_with(2, 1000)
     device.close.assert_called_once_with()
 
 
@@ -133,7 +132,7 @@ def test_io_failures_preserve_metadata_and_close_without_retry(
     if stage in ("open_path", "write"):
         device.read.assert_not_called()
     else:
-        device.read.assert_called_once_with(64, 1000)
+        device.read.assert_called_once_with(2, 1000)
     device.close.assert_called_once_with()
 
 
@@ -141,7 +140,6 @@ def test_io_failures_preserve_metadata_and_close_without_retry(
     ("field", "value"),
     [
         ("vendor_id", 0x1234),
-        ("product_id", 0x1854),
         ("product_id", 0x185C),
         ("interface_number", 0),
         ("interface_number", 1),
@@ -160,7 +158,7 @@ def test_status_never_opens_unsupported_interfaces(
     hid_backend.enumerate.return_value = [{**receiver_configuration, field: value}]
     assert main(["status"]) == 1
     assert capsys.readouterr().out == "Device: unavailable\nBattery: unavailable\n"
-    assert hid_backend.mock_calls == [call.enumerate(0x1038, 0x1852)]
+    assert hid_backend.mock_calls == [call.enumerate(0x1038, 0x1852), call.enumerate(0x1038, 0x1854)]
 
 
 @pytest.mark.parametrize(
@@ -193,7 +191,10 @@ def test_no_receiver_or_enumeration_error_is_unavailable(hid_backend, capsys, er
     output = capsys.readouterr()
     assert output.out == "Device: unavailable\nBattery: unavailable\n"
     assert output.err
-    assert hid_backend.mock_calls == [call.enumerate(0x1038, 0x1852)]
+    expected_calls = [call.enumerate(0x1038, 0x1852)]
+    if error is None:
+        expected_calls.append(call.enumerate(0x1038, 0x1854))
+    assert hid_backend.mock_calls == expected_calls
 
 
 def test_missing_metadata_and_unsupported_versions_are_omitted(
