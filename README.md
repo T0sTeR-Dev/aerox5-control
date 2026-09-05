@@ -1,8 +1,8 @@
 # aerox5-control
 
-An independent Linux utility for the SteelSeries Aerox 5 Wireless. The v0.1
+Aerox 5 Control is an independent community project and is not affiliated with or endorsed by SteelSeries.
 
-application, **Aerox 5 Control**, provides a native GTK4/Libadwaita window and a CLI
+The v0.1 application, **Aerox 5 Control**, provides a native GTK4/Libadwaita window and a CLI
 
 for **HID discovery, cached descriptor inspection, device status, a battery query,
 
