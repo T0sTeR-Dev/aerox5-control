@@ -13,6 +13,8 @@ _CONNECTIONS = {
     AEROX5_WIRED_PRODUCT_ID: "wired",
 }
 
+AEROX5_USB_IDS = frozenset((STEELSERIES_VENDOR_ID, pid) for pid in _CONNECTIONS)
+
 
 @dataclass(frozen=True, slots=True)
 class Aerox5Interface:
@@ -25,8 +27,9 @@ class Aerox5Interface:
 def discover_aerox5(transport: HidDiscovery) -> tuple[Aerox5Interface, ...]:
     """Retain all matching entries, including interfaces sharing HID paths."""
     return tuple(
-        Aerox5Interface(hid=interface, connection=_CONNECTIONS[interface.product_id])
-        for interface in transport.enumerate(STEELSERIES_VENDOR_ID, 0)
+        Aerox5Interface(hid=interface, connection=connection)
+        for product_id, connection in _CONNECTIONS.items()
+        for interface in transport.enumerate(STEELSERIES_VENDOR_ID, product_id)
         if interface.vendor_id == STEELSERIES_VENDOR_ID
-        and interface.product_id in _CONNECTIONS
+        and interface.product_id == product_id
     )

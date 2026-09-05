@@ -26,7 +26,10 @@ def test_discovery_keeps_all_interfaces_and_connections(hid_backend, record):
     assert [item.hid.interface_number for item in interfaces[:5]] == list(range(5))
     assert [item.hid.usage for item in interfaces[4:6]] == [1, 2]
     assert [item.connection for item in interfaces] == ["2.4 GHz"] * 7 + ["wired"]
-    assert hid_backend.mock_calls == [call.enumerate(0x1038, 0)]
+    assert hid_backend.mock_calls == [
+        call.enumerate(0x1038, 0x1852),
+        call.enumerate(0x1038, 0x1854),
+    ]
 
 
 def test_discovery_requires_vendor_and_product_match(hid_backend, record):
@@ -45,4 +48,7 @@ def test_discovery_requires_vendor_and_product_match(hid_backend, record):
 
 def test_no_devices_is_successful(hid_backend):
     assert inspect_interfaces(HidApiTransport(hid_backend)) == ()
-    assert hid_backend.mock_calls == [call.enumerate(0x1038, 0)]
+    assert hid_backend.mock_calls == [
+        call.enumerate(0x1038, 0x1852),
+        call.enumerate(0x1038, 0x1854),
+    ]

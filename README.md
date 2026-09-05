@@ -1,7 +1,8 @@
 # aerox5-control
 
 An independent Linux utility for the SteelSeries Aerox 5 Wireless. The current
-implementation provides **read-only HID enumeration** using python-hidapi.
+implementation provides **read-only HID enumeration and descriptor inspection**
+using python-hidapi and Linux's cached sysfs descriptors.
 It has no dependency on rivalcfg and does not install, import, invoke, or bundle it.
 
 ## Development setup
@@ -32,7 +33,8 @@ normal user; it does not require root or install permission rules.
 
 ## Discovery
 
-The command enumerates SteelSeries HID entries and retains every entry matching:
+The command requests enumeration separately for each exact VID/PID below and
+retains every matching entry:
 
 | Vendor ID | Product ID | Connection |
 | --- | --- | --- |
@@ -56,17 +58,59 @@ backend loading/enumeration error; and 2 for invalid command-line arguments.
 An empty result means the backend reported no matching entries, not that hardware
 absence or permissions have been independently established.
 
+## HID descriptor inspection
+
+```sh
+.venv/bin/aerox5-control-cli hid-info
+```
+
+`hid-info` shows all discovery metadata, descriptor source/length/SHA-256,
+application collections, standard/vendor-specific usage pages, report IDs, and
+input/output/feature report sizes. It reads each distinct HID path's descriptor
+once, retaining all enumerated usage collections for that path. HID entry numbers
+are display ordinals; the separate `Interface number` field is the USB interface
+number. The USB parent path identifies which device owns an interface.
+
+Sizes include constant fields and padding. Payload bytes are rounded up after
+summing all fields belonging to a report type and ID. Wire bytes include an ID
+byte only for explicitly numbered reports; HIDAPI's synthetic zero prefix for
+unnumbered report buffers is not included. These are descriptor-declared lengths,
+not observations of live report traffic or USB endpoint packet sizes.
+
+Descriptors come exclusively from `/sys/class/hidraw/hidrawN/device/report_descriptor`.
+The reader verifies the allowlisted USB identity against cached `HID_ID` before
+and after reading, and checks the interface number when available. It does not
+open `/dev/hidrawN`, even if those device nodes are missing from the environment.
+Unavailable, malformed, or unsupported descriptors produce per-interface errors;
+other interfaces are still displayed and the command exits with status 1.
+An empty discovery result exits with status 0. No fallback opens a device or
+requests a report when cached descriptor inspection fails.
+
+The reusable parser handles HID short items, global Push/Pop, local usage scope,
+extended usages, collections, and separate bit totals for each type/report ID.
+It is a layout summarizer, not a complete HID validator or field-value decoder.
+Long items, delimiters, reserved items, malformed state, and descriptors larger
+than 4096 bytes are rejected without returning partial sizes.
+
+Configuration candidates are inferred from vendor-specific application
+collections with output or feature reports. This is explicitly uncertain and
+does not select an interface for communication. See
+[the observed receiver interfaces](docs/hid-interfaces.md) and
+[captured descriptor fixtures](tests/fixtures/aerox5_receiver.json).
+
 ## Safety and architecture
 
 Only the selected backend's `enumerate(vendor_id, product_id)` is called. The
-application never constructs a HID device handle, opens an interface, reads or sends reports,
+application also reads cached sysfs metadata for matching devices. It never
+constructs a HID device handle, opens an interface, reads or sends reports,
 changes settings, or performs firmware operations. Importing the application
 and requesting CLI help do not import or initialize the HID backend.
 
-The transport package contains generic HID metadata and enumeration. The devices
-package contains the Aerox VID/PID mapping. Application services coordinate
-discovery; the CLI formats the results. Protocol encoding and GTK UI are reserved
-for later phases and are not dependencies of discovery.
+The transport package contains generic HID enumeration and sysfs access. The
+`hid_descriptor` package parses bytes without I/O or Aerox protocol knowledge.
+The devices package contains the Aerox VID/PID mapping. Application services
+coordinate discovery/inspection; the CLI formats the results. Protocol encoding
+and GTK UI are reserved for later phases and are not dependencies of discovery.
 
 ## Checks
 
@@ -78,5 +122,6 @@ for later phases and are not dependencies of discovery.
 
 Every test receives strict mocks for both `hidraw` and `hid` before discovery can
 run. The mocks expose only enumeration; attempts to open devices or send reports
-fail. Tests use synthetic enumeration records and do not access physical HID
-devices.
+fail. Descriptor tests use captured/static byte fixtures and temporary sysfs
+trees; every test redirects the default sysfs root into its temporary directory.
+Tests do not access physical HID devices or the real sysfs tree.

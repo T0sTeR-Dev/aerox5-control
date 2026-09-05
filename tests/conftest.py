@@ -1,9 +1,13 @@
 """All tests replace both native HID modules before discovery can run."""
 
+import json
 import sys
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
+
+from aerox5_control.transport import linux_sysfs
 
 
 @pytest.fixture(autouse=True)
@@ -29,3 +33,45 @@ def record():
         "serial_number": "synthetic-serial",
         "path": b"/dev/hidraw-test0",
     }
+
+
+@pytest.fixture(autouse=True)
+def sysfs_root(tmp_path, monkeypatch):
+    """Default descriptor inspection in tests can never reach real sysfs."""
+    root = tmp_path / "sys" / "class" / "hidraw"
+    root.mkdir(parents=True)
+    monkeypatch.setattr(linux_sysfs, "SYSFS_HIDRAW_ROOT", root)
+    return root
+
+
+@pytest.fixture
+def captured_interfaces():
+    path = Path(__file__).parent / "fixtures" / "aerox5_receiver.json"
+    return json.loads(path.read_text())["interfaces"]
+
+
+@pytest.fixture
+def make_sysfs(sysfs_root, tmp_path):
+    def create(interface, data):
+        name = Path(
+            interface.path.decode()
+            if isinstance(interface.path, bytes)
+            else interface.path
+        ).name
+        number = (
+            interface.interface_number if interface.interface_number is not None else 0
+        )
+        usb_interface = tmp_path / "devices" / "usb-test" / f"1-1:1.{number}"
+        device = usb_interface / name
+        device.mkdir(parents=True)
+        (usb_interface / "bInterfaceNumber").write_text(f"{number:02x}\n")
+        (device / "uevent").write_text(
+            f"HID_ID=0003:{interface.vendor_id:08X}:{interface.product_id:08X}\n"
+        )
+        (device / "report_descriptor").write_bytes(data)
+        entry = sysfs_root / name
+        entry.mkdir()
+        (entry / "device").symlink_to(device, target_is_directory=True)
+        return device
+
+    return create

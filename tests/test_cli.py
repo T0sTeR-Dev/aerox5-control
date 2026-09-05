@@ -36,7 +36,10 @@ def test_inspect_prints_every_field_and_interface(hid_backend, record, capsys):
         "HID path: /dev/wired",
     ):
         assert expected in output.out
-    assert hid_backend.mock_calls == [call.enumerate(0x1038, 0)]
+    assert hid_backend.mock_calls == [
+        call.enumerate(0x1038, 0x1852),
+        call.enumerate(0x1038, 0x1854),
+    ]
 
 
 def test_inspect_handles_missing_metadata_and_non_utf8_path(hid_backend, capsys):
@@ -79,7 +82,13 @@ def test_inspect_reports_missing_dependency(monkeypatch, capsys):
 
 @pytest.mark.parametrize(
     ("args", "status"),
-    [(["--help"], 0), (["inspect", "--help"], 0), ([], 2), (["write"], 2)],
+    [
+        (["--help"], 0),
+        (["inspect", "--help"], 0),
+        (["hid-info", "--help"], 0),
+        ([], 2),
+        (["write"], 2),
+    ],
 )
 def test_argument_handling_never_loads_hid(monkeypatch, hid_backend, args, status):
     def forbid_import(name):

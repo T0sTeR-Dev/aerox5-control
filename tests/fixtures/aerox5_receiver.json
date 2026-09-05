@@ -1,0 +1,37 @@
+{
+  "source": "Cached /sys/class/hidraw/hidrawN/device/report_descriptor, read on 2026-09-05; USB 1038:1852. No HID handles opened or reports requested. Serial numbers omitted.",
+  "vendor_id": 4152,
+  "product_id": 6226,
+  "interfaces": [
+    {
+      "interface_number": 0,
+      "usage_page": 1,
+      "usage": 2,
+      "descriptor_hex": "05010902a1010901a100a1020509190129081500250195087501810205010930093116018026ff7f75109502810609381581257f750895018106c0a102050c0a38021581257f750895018106c0a10206c1ff150026ff00750809f095058102c0c0c0"
+    },
+    {
+      "interface_number": 1,
+      "usage_page": 1,
+      "usage": 6,
+      "descriptor_hex": "05010906a10175019508050719e029e7150025018102050719002aff001500250175019600018102050819012903250175019503910295059101c0"
+    },
+    {
+      "interface_number": 2,
+      "usage_page": 12,
+      "usage": 1,
+      "descriptor_hex": "050c0901a101050c19002aff0f150026ff0f751095028100c0"
+    },
+    {
+      "interface_number": 3,
+      "usage_page": 65472,
+      "usage": 1,
+      "descriptor_hex": "06c0ff0901a10106c1ff150026ff00750809f09540810209f19540910209f2960002b102c0"
+    },
+    {
+      "interface_number": 4,
+      "usage_page": 65473,
+      "usage": 1,
+      "descriptor_hex": "06c1ff0901a10109f0150026ff00750895408102c0"
+    }
+  ]
+}

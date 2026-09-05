@@ -4,7 +4,9 @@ import argparse
 import sys
 from collections.abc import Sequence
 
+from aerox5_control.application.hid_info import inspect_hid_descriptors
 from aerox5_control.application.services import inspect_interfaces
+from aerox5_control.cli.hid_info import format_candidates, format_descriptor
 from aerox5_control.devices.aerox5 import Aerox5Interface
 from aerox5_control.transport.hidapi_backend import HidError
 
@@ -17,7 +19,9 @@ def _text(value: str | int | None) -> str:
     return "(unavailable)" if value is None else str(value)
 
 
-def format_interface(index: int, interface: Aerox5Interface) -> str:
+def format_interface(
+    index: int, interface: Aerox5Interface, *, heading: str = "Interface"
+) -> str:
     """Render cached enumeration metadata without any hardware access."""
     hid = interface.hid
     path = (
@@ -27,7 +31,7 @@ def format_interface(index: int, interface: Aerox5Interface) -> str:
     )
     return "\n".join(
         (
-            f"Interface {index}: Aerox 5 Wireless ({interface.connection})",
+            f"{heading} {index}: Aerox 5 Wireless ({interface.connection})",
             f"  Vendor ID: {_hex(hid.vendor_id)}",
             f"  Product ID: {_hex(hid.product_id)}",
             f"  Interface number: {_text(hid.interface_number)}",
@@ -49,9 +53,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("inspect", help="enumerate all matching HID interfaces")
-    parser.parse_args(argv)
+    commands.add_parser("hid-info", help="inspect cached HID report descriptors")
+    args = parser.parse_args(argv)
 
     try:
+        if args.command == "hid-info":
+            return _hid_info()
         interfaces = inspect_interfaces()
     except HidError as error:
         print(f"aerox5-control-cli: {error}", file=sys.stderr)
@@ -66,3 +73,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         "\n\n".join(format_interface(i, item) for i, item in enumerate(interfaces, 1))
     )
     return 0
+
+
+def _hid_info() -> int:
+    inspections = inspect_hid_descriptors()
+    if not inspections:
+        print("No matching Aerox 5 Wireless HID interfaces reported by HIDAPI.")
+        return 0
+    print(
+        f"Discovered {len(inspections)} distinct HID paths "
+        f"({sum(len(item.entries) for item in inspections)} enumeration entries)."
+    )
+    print("Wire bytes include an explicit report ID byte only for numbered reports.")
+    print("HIDAPI's synthetic zero-ID buffer prefix is not included.\n")
+    for index, item in enumerate(inspections, 1):
+        print(format_interface(index, item.entries[0], heading="HID entry"))
+        print(format_descriptor(item))
+        print()
+    print(format_candidates(inspections))
+    return 1 if any(item.error for item in inspections) else 0
