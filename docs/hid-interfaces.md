@@ -3,7 +3,8 @@
 This document records Phase 2's descriptor-only observations. For Phase 3, the
 project owner confirmed interface 3 as the standard receiver's configuration
 interface, supported by public battery-query research. The implementation now
-uses that selection solely for the [documented battery query](battery-protocol.md).
+uses that selection for the [documented battery query](battery-protocol.md) and
+the separate [active polling-rate operation](polling-protocol.md).
 The project owner subsequently confirmed that the battery query works on the
 physical mouse. No real query was run while implementing the status command or
 running its tests.
@@ -35,7 +36,7 @@ are **unnumbered**, with no report ID byte on the wire.
 | 4 | `/dev/hidraw10` | `0xffc1 / 0x0001` | Vendor-specific | 21 | 64 | — | — |
 
 The HID path numbers can change after reconnecting. Descriptor inspection uses
-enumeration metadata; `battery` and `status` require the confirmed interface 3
+enumeration metadata; `battery`, `status`, and `polling set` require interface 3
 and open its enumerated path.
 
 Interface 0 describes eight buttons, 16-bit X/Y movement, an 8-bit wheel,
@@ -71,10 +72,10 @@ carries status, events, or another kind of data.
 The Phase 2 interface 3 conclusion was a structural inference. Subsequent public
 research and the owner's successful battery test confirm it for that transaction.
 Descriptors alone do not establish command formats, configuration
-semantics, persistence, acknowledgments, or safe values. No configuration
-setting commands have been implemented. Phase 3's battery query is documented
-separately. The wired device's layout remains unverified;
-synthetic wired tests exercise ID handling only.
+semantics, persistence, acknowledgments, or safe values. Active polling rate is
+now the only implemented setting, based on the separately documented protocol.
+Phase 3's battery query is documented separately. The wired device's layout
+remains unverified; synthetic wired tests exercise ID handling only.
 
 ## Sources and reproducibility
 

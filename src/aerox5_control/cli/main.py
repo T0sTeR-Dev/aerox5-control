@@ -9,10 +9,12 @@ from aerox5_control.application.services import (
     get_battery,
     get_status,
     inspect_interfaces,
+    set_polling_rate,
 )
 from aerox5_control.cli.hid_info import format_candidates, format_descriptor
 from aerox5_control.cli.status import format_status
 from aerox5_control.devices.aerox5 import Aerox5Interface
+from aerox5_control.protocol.aerox5 import SUPPORTED_POLLING_RATES
 from aerox5_control.transport.hidapi_backend import HidError
 
 
@@ -51,10 +53,10 @@ def format_interface(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run discovery or report an error without requesting elevated access."""
+    """Run an explicit operation without requesting elevated access."""
     parser = argparse.ArgumentParser(
         prog="aerox5-control-cli",
-        description="Discover the Aerox 5 Wireless and query read-only device status.",
+        description="Inspect Aerox 5 Wireless status or set its active polling rate.",
     )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("inspect", help="enumerate all matching HID interfaces")
@@ -64,9 +66,27 @@ def main(argv: Sequence[str] | None = None) -> int:
         "status",
         help="show receiver identity and query battery/charging on interface 3",
     )
+    polling = commands.add_parser(
+        "polling",
+        help="set the active polling rate without saving to onboard memory",
+        description=(
+            "Send one active polling-rate request through receiver interface 3. "
+            "Readback contents are not decoded; the current rate cannot be queried. "
+            "No save command or automatic retry is sent."
+        ),
+    )
+    polling_commands = polling.add_subparsers(dest="polling_command", required=True)
+    polling_set = polling_commands.add_parser(
+        "set", help="request 125, 250, 500, or 1000 Hz"
+    )
+    polling_set.add_argument(
+        "rate_hz", type=int, choices=SUPPORTED_POLLING_RATES, help="polling rate in Hz"
+    )
     args = parser.parse_args(argv)
 
     try:
+        if args.command == "polling":
+            return _set_polling_rate(args.rate_hz)
         if args.command == "status":
             return _status()
         if args.command == "battery":
@@ -94,6 +114,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(
         "\n\n".join(format_interface(i, item) for i, item in enumerate(interfaces, 1))
     )
+    return 0
+
+
+def _set_polling_rate(rate_hz: int) -> int:
+    result = set_polling_rate(rate_hz)
+    if not result.completed:
+        print(
+            f"aerox5-control-cli: polling-rate request failed: {result.error}",
+            file=sys.stderr,
+        )
+        if result.write_attempted:
+            print(
+                "The active rate may have changed; no retry was sent.", file=sys.stderr
+            )
+        return 1
+    print(f"Polling-rate request sent: {result.requested_rate_hz} Hz")
+    print("Readback received; active rate unverified.")
     return 0
 
 

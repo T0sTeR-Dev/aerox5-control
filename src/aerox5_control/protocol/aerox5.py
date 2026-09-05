@@ -1,4 +1,4 @@
-"""The documented Aerox 5 battery query only; no setting commands."""
+"""Documented Aerox 5 battery queries and active polling-rate encoding."""
 
 from dataclasses import dataclass
 
@@ -7,6 +7,17 @@ WIRELESS_COMMAND_FLAG = 0x40
 BATTERY_QUERY_WIRELESS = BATTERY_QUERY_WIRED | WIRELESS_COMMAND_FLAG
 BATTERY_RESPONSE_SIZE = 2
 CONFIGURATION_INPUT_REPORT_SIZE = 64
+POLLING_RATE_COMMAND_WIRED = 0x2B
+POLLING_RATE_COMMAND_WIRELESS = POLLING_RATE_COMMAND_WIRED | WIRELESS_COMMAND_FLAG
+_POLLING_RATE_VALUES = {1000: 0x00, 500: 0x01, 250: 0x02, 125: 0x03}
+SUPPORTED_POLLING_RATES = tuple(sorted(_POLLING_RATE_VALUES))
+
+
+def encode_polling_rate(rate_hz: int) -> bytes:
+    """Encode only the wireless command/value; no HIDAPI prefix or padding."""
+    if type(rate_hz) is not int or rate_hz not in _POLLING_RATE_VALUES:
+        raise ValueError("Polling rate must be one of 125, 250, 500, or 1000 Hz")
+    return bytes((POLLING_RATE_COMMAND_WIRELESS, _POLLING_RATE_VALUES[rate_hz]))
 
 
 @dataclass(frozen=True, slots=True)

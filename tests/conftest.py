@@ -40,6 +40,25 @@ def io_backend(hid_backend, monkeypatch):
 
 
 @pytest.fixture
+def polling_backend(io_backend):
+    """Separate opt-in guard: polling only, with no battery/save/feature commands."""
+    backend, device = io_backend
+
+    def write(data):
+        assert data in (
+            b"\x00\x6b\x00",
+            b"\x00\x6b\x01",
+            b"\x00\x6b\x02",
+            b"\x00\x6b\x03",
+        ), "Only the four documented polling requests are allowed"
+        return len(data)
+
+    device.write.side_effect = write
+    device.read.return_value = [0] * 64  # Synthetic opaque readback, not an ACK.
+    return backend, device
+
+
+@pytest.fixture
 def receiver_configuration(record):
     return {
         **record,

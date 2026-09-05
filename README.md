@@ -2,8 +2,8 @@
 
 An independent Linux utility for the SteelSeries Aerox 5 Wireless. The current
 implementation provides **HID discovery, cached descriptor inspection, device
-status, and a battery query** using python-hidapi. The battery query is the only
-implemented device command; it does not change settings.
+status, a battery query, and active polling-rate control** using python-hidapi.
+Polling rate is the only implemented setting; no save command is sent.
 It has no dependency on rivalcfg and does not install, import, invoke, or bundle it.
 
 ## Development setup
@@ -172,19 +172,69 @@ exits 0, even when optional metadata is missing. `status` queries only the stand
 ## Safety and architecture
 
 `inspect` only enumerates devices; `hid-info` additionally reads cached sysfs
-metadata. Neither opens a HID handle or requests/sends reports. Only the explicit
-`battery` or `status` command opens receiver interface 3 and sends `00 D2`.
-It never sends feature reports or any setting, save, reset, or firmware commands. Importing the
-application and requesting CLI help do not import or initialize the HID backend.
+metadata. Neither opens a HID handle or requests/sends reports. The explicit
+`battery` and `status` commands open receiver interface 3 and send `00 D2`.
+`polling set` uses the same selection checks and sends only its polling request.
+The application never sends feature reports, other setting commands, save,
+reset, or firmware commands. Importing the application and requesting CLI help
+do not import or initialize the HID backend.
 
 The transport package contains generic HID enumeration, sysfs access, and managed
 output/input report I/O. It knows no Aerox command bytes. The
 `hid_descriptor` package parses bytes without I/O or Aerox protocol knowledge.
-The protocol package constructs the battery payload and strictly decodes replies.
-The devices package owns Aerox interface selection, the battery transaction,
-and structured device status with cached identity metadata.
+The protocol package encodes battery/polling requests and strictly decodes battery
+replies. The devices package owns Aerox interface selection, the transactions,
+structured device status, and polling request results with opaque readback bytes.
 Application services expose these operations; the CLI formats their results.
-GTK UI and settings remain future work.
+GTK UI and other settings remain future work.
+
+## Active polling-rate control: manual hardware test
+
+With the standard receiver connected and the mouse awake, run as your normal
+desktop user from the project directory:
+
+```sh
+.venv/bin/aerox5-control-cli polling set 1000
+```
+
+Supported rates are 125, 250, 500, and 1000 Hz. For usage information:
+
+```sh
+.venv/bin/aerox5-control-cli polling --help
+```
+
+Each invocation validates its rate before HID discovery, selects only
+`1038:1852`, interface 3, page `0xffc0`, usage `1`, and opens the returned path.
+It writes one unnumbered output report and reads up to 64 bytes on the same
+handle with a 1000 ms timeout, then closes. There is no automatic retry.
+
+| Rate | Exact HIDAPI output buffer |
+| --- | --- |
+| 1000 Hz | `00 6B 00` |
+| 500 Hz | `00 6B 01` |
+| 250 Hz | `00 6B 02` |
+| 125 Hz | `00 6B 03` |
+
+No padding is added. `00` is HIDAPI's synthetic report-ID byte. No save command
+(`11` / wireless `51`) or other setting is sent; no onboard persistence is
+requested. A successful transport exchange prints:
+
+```text
+Polling-rate request sent: 1000 Hz
+Readback received; active rate unverified.
+```
+
+Readback bytes are retained internally without interpreting them as an
+acknowledgment or current rate. There is no `polling get` command or cached
+polling value in `status`. Exit status 0 means the write, readback, and close
+completed; it does not establish that the mouse applied the setting.
+
+Invalid arguments exit 2 before hardware access. Selection, permission, write,
+readback, or close failures exit 1 with a diagnostic on stderr. After a write
+attempt the active rate may already have changed, even if readback fails; the
+CLI reports that uncertainty and sends no retry or rollback. The setting command
+has not been run against the physical mouse during development or tests. See
+[the polling protocol and safety details](docs/polling-protocol.md).
 
 ## Checks
 
@@ -197,6 +247,8 @@ GTK UI and settings remain future work.
 Every test replaces both `hidraw` and `hid` before any backend can load. Discovery
 mocks expose only enumeration. Battery tests opt into a fake transport or strict
 mock handles that allow only exact-path open, output write, timed read, and close;
-the I/O fixture rejects any output other than `00 D2`. Descriptor tests use
-captured/static fixtures and temporary sysfs trees. Tests do not access physical
-HID devices or the real sysfs tree.
+the battery I/O fixture rejects any output other than `00 D2`. Polling tests opt
+into a separate mock that permits only the four exact polling buffers above;
+complete call-sequence assertions exclude additional commands, save operations,
+and retries. Descriptor tests use captured/static fixtures and temporary sysfs
+trees. Tests do not access physical HID devices or the real sysfs tree.

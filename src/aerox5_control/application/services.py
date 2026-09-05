@@ -1,9 +1,10 @@
-"""Discovery and explicitly requested read-only receiver status."""
+"""Discovery, receiver status, and explicitly requested active polling changes."""
 
 from aerox5_control.devices.aerox5 import (
     Aerox5Interface,
     Aerox5Receiver,
     Aerox5Status,
+    PollingRateResult,
     discover_aerox5,
 )
 from aerox5_control.protocol.aerox5 import BatteryStatus
@@ -31,3 +32,12 @@ def get_status(transport: HidTransport | None = None) -> Aerox5Status:
     if transport is None:
         transport = HidApiTransport()
     return Aerox5Receiver(transport).get_status()
+
+
+def set_polling_rate(
+    rate_hz: int, transport: HidTransport | None = None
+) -> PollingRateResult:
+    """Send one validated polling request, without querying or saving settings."""
+    if transport is None:
+        transport = HidApiTransport()
+    return Aerox5Receiver(transport).set_polling_rate(rate_hz)
