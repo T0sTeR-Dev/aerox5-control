@@ -6,3 +6,7 @@ __pycache__/
 .ruff_cache/
 build/
 dist/
+packaging/arch/pkg
+packaging/arch/*.gz
+packaging/arch/*.zst
+packaging/arch/src
